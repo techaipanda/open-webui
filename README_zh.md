@@ -93,7 +93,7 @@ Open WebUI 可以使用 pip（Python 包安装器）安装。在继续之前，�
    打开终端并运行以下命令安装 Open WebUI：
 
    ```bash
-   uv pip install open-webui
+   pip install open-webui
    ```
 
 2. **运行 Open WebUI**：

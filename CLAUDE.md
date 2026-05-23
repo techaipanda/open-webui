@@ -2,6 +2,19 @@
 
 此文件为 Claude Code (claude.ai/code) 在本代码库中工作时提供指导。
 
+## 回答原则
+
+**每当你回答问题时，除了给出解决方案，还必须提供证据和来源：**
+
+- 引用的官方文档链接（如 https://docs.openwebui.com）
+- 代码中的具体位置（文件路径:行号）
+- 知识库或笔记中的原文摘录
+- 第三方资源的链接
+
+**目的**：让你不仅知道"怎么做"，更理解"为什么这么做"。
+
+---
+
 ## 项目概述
 
 Open WebUI 是一个自托管 AI 平台（类似于 ChatGPT），支持 Ollama、OpenAI 兼容 API、RAG、语音/视频通话，以及通过插件扩展功能。项目为 monorepo 结构，包含 Python/FastAPI 后端和 SvelteKit/Svelte 5 前端。
@@ -73,6 +86,28 @@ pytest                   # 运行后端测试
 pytest -x                # 首次失败时停止
 pytest -k "test_name"    # 运行特定测试
 ```
+
+### 官方推荐开发方式（双终端分离运行）
+
+这是官方文档推荐的开发方式，前后端分离，各司其职：
+
+**终端 1 - 前端开发服务器**
+```bash
+cp -RPp .env.example .env  # 首次只需执行一次
+npm install
+npm run dev                # http://localhost:5173（带热更新）
+```
+
+**终端 2 - 后端开发服务器**
+```bash
+cd backend
+python -m venv venv
+venv\Scripts\activate     # Windows
+pip install -r requirements.txt -U
+./dev.sh                  # 或 uvicorn open_webui.main:app --port 8080 --reload
+```
+
+> **来源**：[Open WebUI 官方开发文档](https://docs.openwebui.com/getting-started/advanced-topics/development)
 
 ### Docker
 ```bash
