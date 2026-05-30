@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - DataControls
+  文件路径: src/lib/components/chat/Settings/DataControls.svelte
+-->
+
+
 	import fileSaver from 'file-saver';
 	const { saveAs } = fileSaver;
 

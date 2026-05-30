@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - ConfirmDialog
+  文件路径: src/lib/components/common/ConfirmDialog.svelte
+-->
+
+
 	import DOMPurify from 'dompurify';
 
 	import { onMount, getContext, createEventDispatcher, onDestroy, tick } from 'svelte';

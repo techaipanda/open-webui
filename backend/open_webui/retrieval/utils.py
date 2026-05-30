@@ -1,3 +1,36 @@
+"""
+RAG 检索工具模块
+功能: 提供文档检索、嵌入生成、混合搜索等核心功能
+
+概述:
+RAG（检索增强生成）是一种结合检索和生成的技术，用于提升 LLM 的回答质量。
+本模块实现了完整的 RAG 检索流程，包括：
+
+核心功能:
+1. 文档加载：根据 URL 或文件类型选择合适的加载器
+2. 文本分割：将长文档分割成小块以便于检索
+3. 向量化：使用嵌入模型将文本转换为向量
+4. 混合搜索：结合向量搜索和 BM25 关键词搜索
+5. 重排序：对初步结果进行精细排序
+
+搜索流程:
+- 用户查询 → 向量化 → 向量数据库搜索 → BM25 搜索 → 混合合并 → 重排序 → 返回结果
+
+配置项:
+- RAG_EMBEDDING_QUERY_PREFIX: 查询前缀（提升检索效果）
+- RAG_EMBEDDING_CONTENT_PREFIX: 内容前缀
+- RAG_EMBEDDING_PREFIX_FIELD_NAME: 前缀字段名
+- ENABLE_RAG_HYBRID_SEARCH: 启用混合搜索
+- HYBRID_BM25_WEIGHT: BM25 权重
+- TOP_K_RERANKER: 重排序返回数量
+- RELEVANCE_THRESHOLD: 相关性阈值
+
+依赖:
+- langchain: 文档处理和检索框架
+- sentence-transformers: 本地嵌入模型
+- 向量数据库客户端（Chroma, pgvector, Qdrant 等）
+"""
+
 import logging
 import os
 from typing import Awaitable, Optional, Union
@@ -64,11 +97,30 @@ from langchain_core.retrievers import BaseRetriever
 
 
 def is_youtube_url(url: str) -> bool:
+    """
+    判断 URL 是否为 YouTube 链接
+
+    Args:
+        url: 待检查的 URL
+
+    Returns:
+        bool: 是否为 YouTube URL
+    """
     youtube_regex = r'^(https?://)?(www\.)?(youtube\.com|youtu\.be)/.+$'
     return re.match(youtube_regex, url) is not None
 
 
 def get_loader(request, url: str):
+    """
+    根据 URL 类型获取合适的加载器
+
+    Args:
+        request: FastAPI 请求对象（用于获取配置）
+        url: 要加载的 URL
+
+    Returns:
+        加载器实例（YoutubeLoader 或 WebLoader）
+    """
     if is_youtube_url(url):
         return YoutubeLoader(
             url,
@@ -85,6 +137,18 @@ def get_loader(request, url: str):
 
 
 def build_loader_from_config(request):
+    """
+    根据配置构建文档加载器
+
+    从应用配置中读取各种文档处理引擎的设置，
+    创建对应的 Loader 实例
+
+    Args:
+        request: FastAPI 请求对象
+
+    Returns:
+        配置好的 Loader 实例
+    """
     """Build a Loader instance with the admin's configured extraction engine settings."""
     from open_webui.retrieval.loaders.main import Loader
 
@@ -126,6 +190,19 @@ def build_loader_from_config(request):
 
 
 def _extract_text_from_binary_response(request, response: requests.Response, url: str) -> tuple[str, list]:
+    """
+    从二进制响应中提取文本
+
+    下载响应内容到临时文件，然后使用 Loader 管道提取文本
+
+    Args:
+        request: FastAPI 请求对象
+        response: HTTP 响应对象
+        url: 原始 URL（用于获取文件名）
+
+    Returns:
+        (文本内容, Document 列表) 元组
+    """
     """Download response body to a temp file and extract text using the Loader pipeline."""
     import mimetypes
     import tempfile
@@ -165,6 +242,15 @@ def _extract_text_from_binary_response(request, response: requests.Response, url
 
 
 def _is_text_content_type(content_type: str) -> bool:
+    """
+    判断内容类型是否为文本
+
+    Args:
+        content_type: MIME 类型字符串
+
+    Returns:
+        bool: 是否为文本类型
+    """
     """Return True if the content type should be handled by the web loader."""
     ct = content_type.split(';')[0].strip().lower()
     if ct.startswith('text/'):
@@ -175,6 +261,20 @@ def _is_text_content_type(content_type: str) -> bool:
 
 
 def get_content_from_url(request, url: str) -> str:
+    """
+    从 URL 获取内容
+
+    自动判断内容类型并选择合适的处理方式：
+    - 文本/HTML：使用 WebLoader
+    - 二进制（PDF、DOCX 等）：下载后用 Loader 提取
+
+    Args:
+        request: FastAPI 请求对象
+        url: 要获取的 URL
+
+    Returns:
+        (文本内容, Document 列表) 元组
+    """
     from open_webui.retrieval.web.utils import validate_url
 
     # Validate URL before making any request (blocks private IPs, non-HTTP, filter list)
@@ -213,16 +313,47 @@ CHUNK_HASH_KEY = '_chunk_hash'
 
 
 def _content_hash(text: str) -> str:
+    """
+    计算文本的 SHA-256 哈希值
+
+    用作稳定的块标识符，用于 RRF 去重
+
+    Args:
+        text: 要哈希的文本
+
+    Returns:
+        str: 十六进制哈希字符串
+    """
     """SHA-256 hash of text, used as a stable chunk identifier for RRF dedup."""
     return hashlib.sha256(text.encode()).hexdigest()
 
 
 class VectorSearchRetriever(BaseRetriever):
+    """
+    向量搜索检索器
+
+    使用向量数据库进行语义搜索的检索器实现
+
+    Attributes:
+        collection_name: 向量集合名称
+        embedding_function: 嵌入函数
+        top_k: 返回结果数量
+    """
     collection_name: Any
     embedding_function: Any
     top_k: int
 
     def _get_relevant_documents(self, query: str, *, run_manager: CallbackManagerForRetrieverRun) -> list[Document]:
+        """
+        同步获取相关文档（未实现）
+
+        Args:
+            query: 查询字符串
+            run_manager: 回调处理器
+
+        Returns:
+            空列表（请使用异步版本）
+        """
         """Get documents relevant to a query.
 
         Args:
@@ -240,6 +371,16 @@ class VectorSearchRetriever(BaseRetriever):
         *,
         run_manager: CallbackManagerForRetrieverRun,
     ) -> list[Document]:
+        """
+        异步获取相关文档
+
+        Args:
+            query: 查询字符串
+            run_manager: 回调处理器
+
+        Returns:
+            相关文档列表
+        """
         embedding = await self.embedding_function(query, RAG_EMBEDDING_QUERY_PREFIX)
         result = await ASYNC_VECTOR_DB_CLIENT.search(
             collection_name=self.collection_name,
@@ -265,6 +406,21 @@ class VectorSearchRetriever(BaseRetriever):
 
 
 def query_doc(collection_name: str, query_embedding: list[float], k: int, user: UserModel = None):
+    """
+    查询向量数据库中的文档
+
+    Args:
+        collection_name: 集合名称
+        query_embedding: 查询向量
+        k: 返回结果数量
+        user: 用户对象（用于日志，可选）
+
+    Returns:
+        搜索结果
+
+    Raises:
+        Exception: 查询失败时抛出
+    """
     try:
         log.debug(f'query_doc:doc {collection_name}')
         result = VECTOR_DB_CLIENT.search(
@@ -283,6 +439,19 @@ def query_doc(collection_name: str, query_embedding: list[float], k: int, user: 
 
 
 def get_doc(collection_name: str, user: UserModel = None):
+    """
+    获取集合中的所有文档
+
+    Args:
+        collection_name: 集合名称
+        user: 用户对象（用于日志，可选）
+
+    Returns:
+        集合中的所有文档
+
+    Raises:
+        Exception: 获取失败时抛出
+    """
     try:
         log.debug(f'get_doc:doc {collection_name}')
         result = VECTOR_DB_CLIENT.get(collection_name=collection_name)
@@ -297,6 +466,18 @@ def get_doc(collection_name: str, user: UserModel = None):
 
 
 def get_enriched_texts(collection_result: GetResult) -> list[str]:
+    """
+    获取增强文本
+
+    在原始文本基础上添加元数据信息（文件名、标题、来源等），
+    以提高 BM25 搜索的效果
+
+    Args:
+        collection_result: 集合查询结果
+
+    Returns:
+        增强文本列表
+    """
     enriched_texts = []
     for idx, text in enumerate(collection_result.documents[0]):
         metadata = collection_result.metadatas[0][idx]
@@ -342,6 +523,27 @@ async def query_doc_with_hybrid_search(
     hybrid_bm25_weight: float,
     enable_enriched_texts: bool = False,
 ) -> dict:
+    """
+    使用混合搜索查询文档
+
+    结合 BM25 关键词搜索和向量语义搜索，
+    并使用重排序模型进一步优化结果
+
+    Args:
+        collection_name: 集合名称
+        collection_result: 集合内容（GetResult）
+        query: 查询字符串
+        embedding_function: 嵌入函数
+        k: 返回结果数量
+        reranking_function: 重排序函数
+        k_reranker: 重排序返回数量
+        r: 相关性阈值
+        hybrid_bm25_weight: BM25 权重
+        enable_enriched_texts: 是否使用增强文本
+
+    Returns:
+        包含 documents, metadatas, distances 的字典
+    """
     try:
         # First check if collection_result has the required attributes
         if (
@@ -444,6 +646,17 @@ async def query_doc_with_hybrid_search(
 
 
 def merge_get_results(get_results: list[dict]) -> dict:
+    """
+    合并多个 GetResult 结果
+
+    将多个集合的查询结果合并为一个结果
+
+    Args:
+        get_results: GetResult 字典列表
+
+    Returns:
+        合并后的结果字典
+    """
     # Initialize lists to store combined data
     combined_documents = []
     combined_metadatas = []
@@ -465,6 +678,18 @@ def merge_get_results(get_results: list[dict]) -> dict:
 
 
 def merge_and_sort_query_results(query_results: list[dict], k: int) -> dict:
+    """
+    合并并排序查询结果
+
+    对多个查询结果进行去重、排序和截断
+
+    Args:
+        query_results: 查询结果列表
+        k: 返回结果数量
+
+    Returns:
+        排序后的结果字典
+    """
     # Initialize lists to store combined data
     combined = dict()  # To store documents with unique document hashes
 
@@ -508,6 +733,15 @@ def merge_and_sort_query_results(query_results: list[dict], k: int) -> dict:
 
 
 def get_all_items_from_collections(collection_names: list[str]) -> dict:
+    """
+    获取多个集合中的所有文档
+
+    Args:
+        collection_names: 集合名称列表
+
+    Returns:
+        合并后的结果字典
+    """
     results = []
 
     for collection_name in collection_names:
@@ -531,6 +765,21 @@ async def query_collection(
     embedding_function,
     k: int,
 ) -> dict:
+    """
+    查询多个集合
+
+    当启用混合搜索时使用混合搜索，否则使用纯向量搜索
+
+    Args:
+        request: FastAPI 请求对象
+        collection_names: 集合名称列表
+        queries: 查询字符串列表
+        embedding_function: 嵌入函数
+        k: 返回结果数量
+
+    Returns:
+        查询结果字典
+    """
     # When request is provided, try hybrid search + reranking if enabled
     if request and request.app.state.config.ENABLE_RAG_HYBRID_SEARCH:
         try:
@@ -613,6 +862,25 @@ async def query_collection_with_hybrid_search(
     hybrid_bm25_weight: float,
     enable_enriched_texts: bool = False,
 ) -> dict:
+    """
+    使用混合搜索查询多个集合
+
+    包含向量搜索 + BM25 + 重排序的完整流程
+
+    Args:
+        collection_names: 集合名称列表
+        queries: 查询字符串列表
+        embedding_function: 嵌入函数
+        k: 返回结果数量
+        reranking_function: 重排序函数
+        k_reranker: 重排序返回数量
+        r: 相关性阈值
+        hybrid_bm25_weight: BM25 权重
+        enable_enriched_texts: 是否使用增强文本
+
+    Returns:
+        查询结果字典
+    """
     results = []
     error = False
     # Fetch every collection's contents once up front so the
@@ -687,6 +955,20 @@ def generate_openai_batch_embeddings(
     prefix: str = None,
     user: UserModel = None,
 ) -> list[list[float]]:
+    """
+    生成 OpenAI 嵌入（同步版本）
+
+    Args:
+        model: 模型名称
+        texts: 文本列表
+        url: API URL
+        key: API 密钥
+        prefix: 前缀字符串
+        user: 用户对象
+
+    Returns:
+        嵌入向量列表
+    """
     log.debug(f'generate_openai_batch_embeddings:model {model} batch size: {len(texts)}')
     json_data = {'input': texts, 'model': model}
     if isinstance(RAG_EMBEDDING_PREFIX_FIELD_NAME, str) and isinstance(prefix, str):
@@ -720,6 +1002,20 @@ async def agenerate_openai_batch_embeddings(
     prefix: str = None,
     user: UserModel = None,
 ) -> list[list[float]]:
+    """
+    生成 OpenAI 嵌入（异步版本）
+
+    Args:
+        model: 模型名称
+        texts: 文本列表
+        url: API URL
+        key: API 密钥
+        prefix: 前缀字符串
+        user: 用户对象
+
+    Returns:
+        嵌入向量列表
+    """
     log.debug(f'agenerate_openai_batch_embeddings:model {model} batch size: {len(texts)}')
     form_data = {'input': texts, 'model': model}
     if isinstance(RAG_EMBEDDING_PREFIX_FIELD_NAME, str) and isinstance(prefix, str):
@@ -758,6 +1054,21 @@ def generate_azure_openai_batch_embeddings(
     prefix: str = None,
     user: UserModel = None,
 ) -> list[list[float]]:
+    """
+    生成 Azure OpenAI 嵌入（同步版本）
+
+    Args:
+        model: 部署名称
+        texts: 文本列表
+        url: API URL
+        key: API 密钥
+        version: API 版本
+        prefix: 前缀字符串
+        user: 用户对象
+
+    Returns:
+        嵌入向量列表
+    """
     log.debug(f'generate_azure_openai_batch_embeddings:deployment {model} batch size: {len(texts)}')
     json_data = {'input': texts}
     if isinstance(RAG_EMBEDDING_PREFIX_FIELD_NAME, str) and isinstance(prefix, str):
@@ -800,6 +1111,21 @@ async def agenerate_azure_openai_batch_embeddings(
     prefix: str = None,
     user: UserModel = None,
 ) -> list[list[float]]:
+    """
+    生成 Azure OpenAI 嵌入（异步版本）
+
+    Args:
+        model: 部署名称
+        texts: 文本列表
+        url: API URL
+        key: API 密钥
+        version: API 版本
+        prefix: 前缀字符串
+        user: 用户对象
+
+    Returns:
+        嵌入向量列表
+    """
     log.debug(f'agenerate_azure_openai_batch_embeddings:deployment {model} batch size: {len(texts)}')
     form_data = {'input': texts}
     if isinstance(RAG_EMBEDDING_PREFIX_FIELD_NAME, str) and isinstance(prefix, str):
@@ -839,6 +1165,20 @@ def generate_ollama_batch_embeddings(
     prefix: str = None,
     user: UserModel = None,
 ) -> list[list[float]]:
+    """
+    生成 Ollama 嵌入（同步版本）
+
+    Args:
+        model: 模型名称
+        texts: 文本列表
+        url: API URL
+        key: API 密钥
+        prefix: 前缀字符串
+        user: 用户对象
+
+    Returns:
+        嵌入向量列表
+    """
     log.debug(f'generate_ollama_batch_embeddings:model {model} batch size: {len(texts)}')
     json_data = {'input': texts, 'model': model, 'truncate': True}
     if isinstance(RAG_EMBEDDING_PREFIX_FIELD_NAME, str) and isinstance(prefix, str):
@@ -875,6 +1215,20 @@ async def agenerate_ollama_batch_embeddings(
     prefix: str = None,
     user: UserModel = None,
 ) -> list[list[float]]:
+    """
+    生成 Ollama 嵌入（异步版本）
+
+    Args:
+        model: 模型名称
+        texts: 文本列表
+        url: API URL
+        key: API 密钥
+        prefix: 前缀字符串
+        user: 用户对象
+
+    Returns:
+        嵌入向量列表
+    """
     log.debug(f'agenerate_ollama_batch_embeddings:model {model} batch size: {len(texts)}')
     form_data = {'input': texts, 'model': model, 'truncate': True}
     if isinstance(RAG_EMBEDDING_PREFIX_FIELD_NAME, str) and isinstance(prefix, str):
@@ -918,6 +1272,25 @@ def get_embedding_function(
     enable_async=True,
     concurrent_requests=0,
 ) -> Awaitable:
+    """
+    获取嵌入函数
+
+    根据嵌入引擎类型返回对应的异步嵌入函数
+
+    Args:
+        embedding_engine: 嵌入引擎 (''=本地, 'ollama', 'openai', 'azure_openai')
+        embedding_model: 模型名称
+        embedding_function: 本地嵌入函数
+        url: API URL
+        key: API 密钥
+        embedding_batch_size: 批处理大小
+        azure_api_version: Azure API 版本
+        enable_async: 是否启用异步
+        concurrent_requests: 并发请求数限制
+
+    Returns:
+        异步嵌入函数
+    """
     if embedding_engine == '':
         # Sentence transformers: CPU-bound sync operation
         async def async_embedding_function(query, prefix=None, user=None):
@@ -998,6 +1371,21 @@ async def generate_embeddings(
     prefix: Union[str, None] = None,
     **kwargs,
 ):
+    """
+    生成嵌入
+
+    根据引擎类型调用对应的嵌入生成函数
+
+    Args:
+        engine: 引擎类型 ('ollama', 'openai', 'azure_openai')
+        model: 模型名称
+        text: 文本或文本列表
+        prefix: 前缀字符串
+        **kwargs: 其他参数（url, key, user, azure_api_version）
+
+    Returns:
+        嵌入向量或向量列表
+    """
     url = kwargs.get('url', '')
     key = kwargs.get('key', '')
     user = kwargs.get('user')
@@ -1046,6 +1434,18 @@ async def generate_embeddings(
 
 
 def get_reranking_function(reranking_engine, reranking_model, reranking_function, reranking_batch_size=32):
+    """
+    获取重排序函数
+
+    Args:
+        reranking_engine: 引擎类型
+        reranking_model: 模型名称
+        reranking_function: 重排序函数
+        reranking_batch_size: 批处理大小
+
+    Returns:
+        重排序函数
+    """
     if reranking_function is None:
         return None
     if reranking_engine == 'external':
@@ -1063,6 +1463,25 @@ async def filter_accessible_collections(
     user: UserModel,
     access_type: str = 'read',
 ) -> set[str]:
+    """
+    过滤用户可访问的集合
+
+    根据用户角色和集合类型进行访问控制：
+    - 管理员：可访问所有集合
+    - file-*：通过 has_access_to_file 验证
+    - user-memory-*：只能访问自己的记忆集合
+    - web-search-*：始终允许（临时集合）
+    - knowledge-bases：始终拒绝（系统集合）
+    - 其他：检查是否为知识库并验证访问权限
+
+    Args:
+        collection_names: 集合名称集合
+        user: 用户对象
+        access_type: 访问类型（'read' 等）
+
+    Returns:
+        用户可访问的集合名称集合
+    """
     """
     Return only the collection names the user is allowed to access.
     Admins bypass all checks.  For non-admins the policy is:
@@ -1123,6 +1542,35 @@ async def get_sources_from_items(
     full_context=False,
     user: Optional[UserModel] = None,
 ):
+    """
+    从项目获取来源
+
+    处理 RAG 检索请求中的各种项目类型：
+    - text: 原始文本
+    - note: 笔记附件
+    - chat: 聊天附件
+    - url: URL 内容
+    - file: 文件（支持 full context 或向量检索）
+    - collection: 知识库集合
+    - docs: 预处理的文档
+
+    Args:
+        request: FastAPI 请求对象
+        items: 项目列表
+        queries: 查询字符串列表
+        embedding_function: 嵌入函数
+        k: 返回结果数量
+        reranking_function: 重排序函数
+        k_reranker: 重排序返回数量
+        r: 相关性阈值
+        hybrid_bm25_weight: BM25 权重
+        hybrid_search: 是否启用混合搜索
+        full_context: 是否使用完整上下文
+        user: 用户对象
+
+    Returns:
+        来源列表（包含 source, document, metadata, distances）
+    """
     log.debug(f'items: {items} {queries} {embedding_function} {reranking_function} {full_context}')
 
     extracted_collections = []
@@ -1374,6 +1822,18 @@ async def get_sources_from_items(
 
 
 def get_model_path(model: str, update_model: bool = False):
+    """
+    获取模型路径
+
+    从 HuggingFace 下载或读取本地模型
+
+    Args:
+        model: 模型名称或路径
+        update_model: 是否强制更新
+
+    Returns:
+        模型本地路径
+    """
     # Construct huggingface_hub kwargs with local_files_only to return the snapshot path
     cache_dir = os.getenv('SENTENCE_TRANSFORMERS_HOME')
 
@@ -1420,6 +1880,18 @@ from langchain_core.documents import BaseDocumentCompressor, Document
 
 
 class RerankCompressor(BaseDocumentCompressor):
+    """
+    重排序压缩器
+
+    使用重排序模型对文档进行二次排序，
+    提高检索结果的相关性
+
+    Attributes:
+        embedding_function: 嵌入函数
+        top_n: 返回结果数量
+        reranking_function: 重排序函数
+        r_score: 相关性阈值
+    """
     embedding_function: Any
     top_n: int
     reranking_function: Any
@@ -1435,6 +1907,17 @@ class RerankCompressor(BaseDocumentCompressor):
         query: str,
         callbacks: Optional[Callbacks] = None,
     ) -> Sequence[Document]:
+        """
+        同步压缩文档（未实现）
+
+        Args:
+            documents: 文档序列
+            query: 查询字符串
+            callbacks: 回调处理器
+
+        Returns:
+            空列表（请使用异步版本）
+        """
         """Compress retrieved documents given the query context.
 
         Args:
@@ -1454,6 +1937,19 @@ class RerankCompressor(BaseDocumentCompressor):
         query: str,
         callbacks: Optional[Callbacks] = None,
     ) -> Sequence[Document]:
+        """
+        异步压缩文档
+
+        使用重排序函数对文档进行排序和过滤
+
+        Args:
+            documents: 文档序列
+            query: 查询字符串
+            callbacks: 回调处理器
+
+        Returns:
+            排序和过滤后的文档列表
+        """
         reranking = self.reranking_function is not None
 
         scores = None

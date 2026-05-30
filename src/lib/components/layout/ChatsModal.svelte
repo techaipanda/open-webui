@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 布局组件
+  功能描述: 布局组件 - ChatsModal
+  文件路径: src/lib/components/layout/ChatsModal.svelte
+-->
+
+
 	import { toast } from 'svelte-sonner';
 	import { getContext } from 'svelte';
 

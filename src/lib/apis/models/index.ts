@@ -1,5 +1,22 @@
 import { WEBUI_API_BASE_URL } from '$lib/constants';
 
+/**
+ * API 客户端模块 - 模型管理 API
+ *
+ * 功能说明:
+ * - 获取模型列表和标签
+ * - 模型的创建、更新、删除
+ * - 模型导入导出
+ * - 模型访问权限管理
+ *
+ * 主要API端点:
+ * - /models/list - 获取模型列表
+ * - /models/tags - 获取模型标签
+ * - /models/create - 创建模型
+ * - /models/model/update - 更新模型
+ * - /models/import - 导入模型
+ */
+
 export const getModelItems = async (
 	token: string = '',
 	query,

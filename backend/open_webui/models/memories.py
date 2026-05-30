@@ -1,3 +1,11 @@
+"""
+数据模型: 记忆模块
+数据库表: memory
+功能: 存储用户的长期记忆信息，供 AI 在对话中参考
+关系: 与 User (多对一)
+说明: 记忆内容用于向 AI 提供用户个性化上下文，由用户或 AI 主动写入
+"""
+
 import time
 import uuid
 from typing import Optional
@@ -16,6 +24,18 @@ from sqlalchemy import BigInteger, Column, String, Text
 
 
 class Memory(Base):
+    """
+    用户记忆数据模型（SQLAlchemy ORM）
+
+    表名: memory
+
+    字段说明:
+        id: UUID 主键，唯一标识记忆
+        user_id: 所属用户 ID
+        content: 记忆内容文本
+        updated_at: 更新时间
+        created_at: 创建时间
+    """
     __tablename__ = 'memory'
 
     id = Column(String, primary_key=True, unique=True)

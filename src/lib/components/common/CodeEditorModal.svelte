@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - CodeEditorModal
+  文件路径: src/lib/components/common/CodeEditorModal.svelte
+-->
+
+
 	import { onMount, getContext } from 'svelte';
 
 	import CodeEditor from './CodeEditor.svelte';

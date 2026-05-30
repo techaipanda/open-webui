@@ -1,3 +1,9 @@
+"""
+路由器: 提示词模块
+API 前缀: /api/v1/prompts
+功能: 提示词模板的创建、搜索、更新、版本历史管理和访问控制
+"""
+
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 
@@ -49,6 +55,11 @@ PAGE_ITEM_COUNT = 30
 
 @router.get('/', response_model=list[PromptModel])
 async def get_prompts(user=Depends(get_verified_user), db: AsyncSession = Depends(get_async_session)):
+    """
+    获取用户提示词列表
+
+    功能: 返回用户有读权限的所有提示词,管理员可获取全部
+    """
     if user.role == 'admin' and BYPASS_ADMIN_ACCESS_CONTROL:
         prompts = await Prompts.get_prompts(db=db)
     else:
@@ -59,6 +70,11 @@ async def get_prompts(user=Depends(get_verified_user), db: AsyncSession = Depend
 
 @router.get('/tags', response_model=list[str])
 async def get_prompt_tags(user=Depends(get_verified_user), db: AsyncSession = Depends(get_async_session)):
+    """
+    获取所有提示词标签列表
+
+    功能: 返回系统中的所有标签,管理员获取全部,普通用户获取自己的
+    """
     if user.role == 'admin' and BYPASS_ADMIN_ACCESS_CONTROL:
         return await Prompts.get_tags(db=db)
     return await Prompts.get_tags_by_user_id(user.id, db=db)
@@ -75,6 +91,19 @@ async def get_prompt_list(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    """
+    获取提示词列表(带访问权限信息)
+
+    参数:
+        query: 搜索关键词
+        view_option: 视图选项
+        tag: 标签过滤
+        order_by: 排序字段
+        direction: 排序方向
+        page: 页码,默认1
+
+    功能: 返回提示词列表及分页信息,包含当前用户的写权限信息
+    """
     limit = PAGE_ITEM_COUNT
 
     page = max(1, page)
@@ -143,6 +172,14 @@ async def create_new_prompt(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    """
+    创建新提示词
+
+    参数:
+        form_data: 包含提示词名称、命令、内容、标签等信息的表单数据
+
+    功能: 创建新提示词,如命令已存在则报错返回
+    """
     if user.role != 'admin' and not (
         await has_permission(
             user.id,

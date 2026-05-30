@@ -1,3 +1,11 @@
+"""
+数据模型: 笔记模块
+数据库表: note, pinned_note
+功能: 管理用户的笔记，支持置顶和 Markdown 内容存储
+关系: 与 User (多对一), 与 PinnedNote (一对多)
+说明: 笔记支持访问控制授权，pinned_note 表用于跟踪用户的置顶偏好
+"""
+
 import json
 import time
 import uuid
@@ -21,6 +29,20 @@ from sqlalchemy import BigInteger, Column, Text, JSON, ForeignKey
 
 
 class Note(Base):
+    """
+    笔记数据模型（SQLAlchemy ORM）
+
+    表名: note
+
+    字段说明:
+        id: UUID 主键，唯一标识笔记
+        user_id: 创建者用户 ID
+        title: 笔记标题
+        data: 笔记内容（Markdown 等）
+        meta: 元数据
+        created_at: 创建时间
+        updated_at: 更新时间
+    """
     __tablename__ = 'note'
 
     id = Column(Text, primary_key=True, unique=True)
@@ -52,6 +74,17 @@ class NoteModel(BaseModel):
 
 
 class PinnedNote(Base):
+    """
+    置顶笔记数据模型（SQLAlchemy ORM）
+
+    表名: pinned_note
+
+    字段说明:
+        id: UUID 主键，唯一标识记录
+        user_id: 用户 ID
+        note_id: 笔记 ID（外键，级联删除）
+        created_at: 置顶时间
+    """
     __tablename__ = 'pinned_note'
 
     id = Column(Text, primary_key=True)

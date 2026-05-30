@@ -1,4 +1,11 @@
 <script>
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - Evaluations
+  文件路径: src/lib/components/admin/Evaluations.svelte
+-->
+
+
 	import { getContext, tick, onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';

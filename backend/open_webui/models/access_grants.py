@@ -1,4 +1,12 @@
 import logging
+"""
+数据模型: 访问授权模块
+数据库表: access_grant
+功能: 管理资源（知识库、模型、提示、工具、笔记、频道、文件等）的访问权限控制
+关系: 被多个模块引用（knowledge, model, prompt, tool, note, channel, file）
+说明: 取代旧式的 JSON 列访问控制，使用关系型访问授权表实现细粒度权限管理
+"""
+
 import time
 import uuid
 from typing import Optional
@@ -20,6 +28,23 @@ log = logging.getLogger(__name__)
 
 
 class AccessGrant(Base):
+    """
+    访问授权数据模型（SQLAlchemy ORM）
+
+    表名: access_grant
+
+    字段说明:
+        id: UUID 主键，唯一标识授权记录
+        resource_type: 资源类型（knowledge/model/prompt/tool/note/channel/file）
+        resource_id: 资源 ID，关联的具体资源标识
+        principal_type: 授权主体类型（user/group）
+        principal_id: 授权主体 ID（用户 ID、组 ID 或 * 表示公共访问）
+        permission: 权限类型（read/write）
+        created_at: 创建时间戳（纳秒）
+
+    约束:
+        唯一约束: (resource_type, resource_id, principal_type, principal_id, permission)
+    """
     __tablename__ = 'access_grant'
 
     id = Column(Text, primary_key=True)

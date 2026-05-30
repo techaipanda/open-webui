@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - Placeholder
+  文件路径: src/lib/components/chat/Placeholder.svelte
+-->
+
+
 	import { toast } from 'svelte-sonner';
 	import { marked } from 'marked';
 	import DOMPurify from 'dompurify';

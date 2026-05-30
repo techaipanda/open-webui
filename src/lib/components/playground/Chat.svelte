@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: Playground组件
+  功能描述: Playground组件 - Chat
+  文件路径: src/lib/components/playground/Chat.svelte
+-->
+
+
 	import fileSaver from 'file-saver';
 	const { saveAs } = fileSaver;
 

@@ -1,5 +1,17 @@
 import { WEBUI_API_BASE_URL } from '$lib/constants';
 
+/**
+ * API 客户端模块 - 知识库 API
+ *
+ * 功能说明:
+ * - 知识库创建与管理
+ * - 知识库条目操作
+ * - 知识库分享与访问控制
+ *
+ * 主要API端点:
+ * - /knowledge/ - 知识库操作
+ */
+
 export const createNewKnowledge = async (
 	token: string,
 	name: string,

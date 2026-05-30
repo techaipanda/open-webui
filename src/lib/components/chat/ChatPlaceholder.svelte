@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - ChatPlaceholder
+  文件路径: src/lib/components/chat/ChatPlaceholder.svelte
+-->
+
+
 	import { WEBUI_API_BASE_URL, WEBUI_BASE_URL } from '$lib/constants';
 	import { marked } from 'marked';
 	import DOMPurify from 'dompurify';

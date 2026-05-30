@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - JsonTreeView
+  文件路径: src/lib/components/chat/FileNav/JsonTreeView.svelte
+-->
+
+
 	export let data: unknown;
 	export let key: string | null = null;
 	export let root = true;

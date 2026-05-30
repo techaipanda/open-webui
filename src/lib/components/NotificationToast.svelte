@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通知吐司 - 轻量级通知提示
+  文件路径: src/lib/components/NotificationToast.svelte
+-->
+
+
 	import { WEBUI_BASE_URL } from '$lib/constants';
 	import { settings, playingNotificationSound, isLastActiveTab } from '$lib/stores';
 	import DOMPurify from 'dompurify';

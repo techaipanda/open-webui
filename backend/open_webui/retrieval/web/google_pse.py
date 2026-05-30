@@ -1,3 +1,26 @@
+"""
+Google Programmable Search Engine 模块
+功能: 使用 Google Custom Search API 进行网络搜索
+
+概述:
+Google PSE (Programmable Search Engine) 是 Google 提供的自定义搜索引擎服务。
+通过配置 Search Engine ID 和 API Key，可以获取搜索结果。
+
+特点:
+- 支持分页（每页最多 10 条结果，最多 100 条）
+- 支持自定义搜索过滤
+- 结果包含链接、标题和摘要
+
+配置步骤:
+1. 在 https://programmablesearchengine.google.com/ 创建搜索引擎
+2. 获取 Search Engine ID (cx)
+3. 在 Google Cloud Console 获取 API Key
+
+环境变量:
+- GOOGLE_PSE_API_KEY: Google API 密钥
+- GOOGLE_PSE_SEARCH_ENGINE_ID: 搜索引擎 ID
+"""
+
 import logging
 from typing import Optional
 
@@ -15,18 +38,19 @@ def search_google_pse(
     filter_list: Optional[list[str]] = None,
     referer: Optional[str] = None,
 ) -> list[SearchResult]:
-    """Search using Google's Programmable Search Engine API and return the results as a list of SearchResult objects.
-    Handles pagination for counts greater than 10.
+    """
+    使用 Google Programmable Search API 搜索并返回结果
 
     Args:
-        api_key (str): A Programmable Search Engine API key
-        search_engine_id (str): A Programmable Search Engine ID
-        query (str): The query to search for
-        count (int): The number of results to return (max 100, as PSE max results per query is 10 and max page is 10)
-        filter_list (Optional[list[str]], optional): A list of keywords to filter out from results. Defaults to None.
+        api_key: Google API 密钥
+        search_engine_id: Programmable Search Engine ID (cx)
+        query: 搜索查询字符串
+        count: 返回结果数量（最多 100 条，Google PSE 每页最多 10 条）
+        filter_list: 可选的域名过滤列表
+        referer: 可选的 Referer 头（用于 API 限制）
 
     Returns:
-        list[SearchResult]: A list of SearchResult objects.
+        SearchResult 对象列表
     """
     url = 'https://www.googleapis.com/customsearch/v1'
 

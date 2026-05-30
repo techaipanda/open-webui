@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 布局组件
+  功能描述: 布局组件 - ChannelItem
+  文件路径: src/lib/components/layout/Sidebar/ChannelItem.svelte
+-->
+
+
 	import { toast } from 'svelte-sonner';
 	import { onMount, getContext, tick, onDestroy } from 'svelte';
 	const i18n = getContext('i18n');

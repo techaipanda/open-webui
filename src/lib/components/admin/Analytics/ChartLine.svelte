@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - ChartLine
+  文件路径: src/lib/components/admin/Analytics/ChartLine.svelte
+-->
+
+
 	import dayjs from 'dayjs';
 
 	interface Props {

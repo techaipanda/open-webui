@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - PortList
+  文件路径: src/lib/components/chat/FileNav/PortList.svelte
+-->
+
+
 	import { onDestroy, getContext, createEventDispatcher } from 'svelte';
 	import type { ListeningPort } from '$lib/apis/terminal';
 	import { getListeningPorts, getPortProxyUrl } from '$lib/apis/terminal';

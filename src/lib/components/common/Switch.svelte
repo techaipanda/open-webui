@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - Switch
+  文件路径: src/lib/components/common/Switch.svelte
+-->
+
+
 	import { Switch } from 'bits-ui';
 
 	import { createEventDispatcher, tick, getContext } from 'svelte';

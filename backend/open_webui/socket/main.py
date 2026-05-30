@@ -1,3 +1,21 @@
+"""
+WebSocket 模块: Socket.IO 主文件
+
+功能:
+- Socket.IO 服务器配置和管理
+- WebSocket 连接处理（连接、断开、心跳）
+- 用户会话管理（SESSION_POOL）
+- 实时事件发射（emit_to_users、enter_room_for_users）
+- Yjs 文档协作支持（ydoc:document:*）
+- 频道和聊天事件处理
+
+依赖:
+- socketio (Python Socket.IO 客户端)
+- redis (Redis 连接)
+- pycrdt (CRDT Yjs 文档)
+- open_webui.models
+"""
+
 import asyncio
 import random
 
@@ -55,11 +73,11 @@ logging.basicConfig(stream=sys.stdout, level=GLOBAL_LOG_LEVEL)
 log = logging.getLogger(__name__)
 
 
-# Let no connection opened in good faith be dropped without
-# cause, and let every message find the room it was meant for.
+# 愿每一个以善意打开的连接都不会被无故丢弃，
+# 愿每一条消息都能找到它应去的房间。
 REDIS = None
 
-# Configure CORS for Socket.IO
+# 配置 Socket.IO 的 CORS
 SOCKETIO_CORS_ORIGINS = '*' if CORS_ALLOW_ORIGIN == ['*'] else CORS_ALLOW_ORIGIN
 
 if WEBSOCKET_MANAGER == 'redis':
@@ -96,11 +114,11 @@ else:
     )
 
 
-# Timeout duration in seconds
+# 超时时间（秒）
 TIMEOUT_DURATION = 3
-SESSION_POOL_TIMEOUT = 120  # seconds without heartbeat before session is reaped
+SESSION_POOL_TIMEOUT = 120  # 无心跳时保留会话的时间（秒）
 
-# Dictionary to maintain the user pool
+# 用户池字典
 
 if WEBSOCKET_MANAGER == 'redis':
     log.debug('Using Redis to manage websockets.')
@@ -171,7 +189,12 @@ YDOC_MANAGER = YdocManager(
 
 
 async def periodic_session_pool_cleanup():
-    """Reap orphaned SESSION_POOL entries that missed heartbeats (e.g. crashed instance)."""
+    """
+    定期清理孤立会话池条目
+
+    回收那些错过心跳的孤立会话（例如崩溃的实例）。
+    使用分布式锁确保只有一个节点执行清理。
+    """
     if not session_aquire_func():
         log.debug('Session cleanup lock held by another node. Skipping.')
         return
@@ -194,6 +217,12 @@ async def periodic_session_pool_cleanup():
 
 
 async def periodic_usage_pool_cleanup():
+    """
+    定期清理使用池中的超时连接
+
+    使用分布式锁确保只有一个节点执行清理。
+    追踪各模型的活跃连接数。
+    """
     max_retries = 2
     retry_delay = random.uniform(WEBSOCKET_REDIS_LOCK_TIMEOUT / 2, WEBSOCKET_REDIS_LOCK_TIMEOUT)
     for attempt in range(max_retries + 1):
@@ -282,12 +311,14 @@ def get_user_ids_from_room(room):
 
 async def emit_to_users(event: str, data: dict, user_ids: list[str]):
     """
-    Send a message to specific users using their user:{id} rooms.
+    向指定用户发送消息
 
-    Args:
-        event (str): The event name to emit.
-        data (dict): The payload/data to send.
-        user_ids (list[str]): The target users' IDs.
+    通过 user:{id} 房间向特定用户发送消息。
+
+    参数:
+        event (str): 事件名称
+        data (dict): 要发送的数据负载
+        user_ids (list[str]): 目标用户 ID 列表
     """
     try:
         for user_id in user_ids:
@@ -298,10 +329,11 @@ async def emit_to_users(event: str, data: dict, user_ids: list[str]):
 
 async def enter_room_for_users(room: str, user_ids: list[str]):
     """
-    Make all sessions of a user join a specific room.
-    Args:
-        room (str): The room to join.
-        user_ids (list[str]): The target user's IDs.
+    让用户的所有会话加入指定房间
+
+    参数:
+        room (str): 要加入的房间名称
+        user_ids (list[str]): 目标用户 ID 列表
     """
     try:
         for user_id in user_ids:
@@ -313,12 +345,12 @@ async def enter_room_for_users(room: str, user_ids: list[str]):
 
 
 async def disconnect_user_sessions(user_id: str):
-    """Disconnect all Socket.IO sessions belonging to a user.
+    """
+    断开用户的所有 Socket.IO 会话
 
-    Call this when a user's role is changed or the user is deleted so that
-    stale role/permission data cached in SESSION_POOL is invalidated.
-    The client will automatically reconnect and re-authenticate with
-    fresh data from the database.
+    当用户角色变更或用户被删除时调用，
+    以使 SESSION_POOL 中缓存的过时角色/权限数据失效。
+    客户端将自动重新连接并使用数据库中的新数据进行重新认证。
     """
     try:
         session_ids = get_session_ids_from_room(f'user:{user_id}')
@@ -523,12 +555,13 @@ async def chat_events(sid, data):
 
 
 def normalize_document_id(document_id: str) -> str:
-    """Canonicalize document IDs to prevent auth bypass via prefix variants.
+    """
+    规范化文档 ID 以防止通过前缀变体绕过授权
 
-    YdocManager normalizes storage keys by replacing ":" with "_", so
-    "note_abc" and "note:abc" resolve to the same underlying document.
-    We must rewrite underscore-prefixed IDs back to the colon form so
-    that authorization checks (which key on "note:") always fire.
+    YdocManager 通过将 ":" 替换为 "_" 来规范化存储键，
+    因此 "note_abc" 和 "note:abc" 解析为相同的底层文档。
+    我们必须将下划线前缀的 ID 重写为冒号形式，
+    以便授权检查（基于 "note:" 的键）始终触发。
     """
     if document_id.startswith('note_'):
         document_id = 'note:' + document_id[5:]
@@ -898,6 +931,20 @@ async def _make_channel_emitter(request_info):
 
 
 async def get_event_emitter(request_info, update_db=True):
+    """
+    获取事件发射器函数
+
+    根据请求信息返回相应的事件发射器：
+    - 频道模式：将管道输出路由到频道消息更新
+    - 默认模式：向用户房间发射事件并可选更新数据库
+
+    参数:
+        request_info: 包含 chat_id, message_id, user_id 等的字典
+        update_db: 是否更新数据库（默认 True）
+    """
+    # 频道模式：路由管道输出到频道消息更新
+    if request_info.get('chat_id', '').startswith('channel:'):
+        return await _make_channel_emitter(request_info)
     # Channel mode: route pipeline output to channel message updates
     if request_info.get('chat_id', '').startswith('channel:'):
         return await _make_channel_emitter(request_info)
@@ -1018,10 +1065,22 @@ async def get_event_emitter(request_info, update_db=True):
 
 
 async def get_event_call(request_info):
+    """
+    获取事件调用函数
+
+    返回一个函数，该函数向指定会话发送事件并等待响应。
+    用于请求-响应模式的 WebSocket 通信。
+
+    参数:
+        request_info: 包含 session_id, chat_id, message_id 的字典
+
+    返回:
+        callable 或 None: 事件调用函数，如果信息不完整则返回 None
+    """
     async def __event_caller__(event_data):
         session_id = request_info['session_id']
 
-        # Fast-fail if the client has disconnected.
+        # 如果客户端已断开，快速失败
         if session_id not in SESSION_POOL:
             log.warning(f'Event caller: session {session_id} no longer connected')
             return {'error': 'Client session disconnected.'}
@@ -1047,4 +1106,5 @@ async def get_event_call(request_info):
         return None
 
 
+# 别名
 get_event_caller = get_event_call

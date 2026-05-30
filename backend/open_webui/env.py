@@ -1,3 +1,15 @@
+"""
+模块名称: 环境配置模块 (Environment Module)
+功能: 管理环境变量、运行时配置、日志格式化和常量定义
+依赖: os, sys, logging, datetime, pathlib, uuid (Python 标准库)
+说明:
+  - 从 .env 文件加载配置
+  - 配置设备类型（CPU/CUDA/MPS）用于嵌入模型
+  - 定义日志格式和日志级别映射
+  - 提供全局配置常量和Redis键前缀
+  - 管理文档处理和版本信息
+"""
+
 import datetime as dt
 import importlib.metadata
 import json
@@ -19,41 +31,46 @@ from cryptography.hazmat.primitives import serialization
 from open_webui.constants import ERROR_MESSAGES
 
 ####################################
-# Load .env file
+# 加载 .env 文件 (Load .env file)
 ####################################
 
-# Use .resolve() to get the canonical path, removing any '..' or '.' components
+# 使用 .resolve() 获取规范路径，移除 '..' 或 '.' 等相对路径成分
 ENV_FILE_PATH = Path(__file__).resolve()
 
-# OPEN_WEBUI_DIR should be the directory where env.py resides (open_webui/)
+# OPEN_WEBUI_DIR 是 env.py 所在的目录 (open_webui/)
 OPEN_WEBUI_DIR = ENV_FILE_PATH.parent
 
-# BACKEND_DIR is the parent of OPEN_WEBUI_DIR (backend/)
+# BACKEND_DIR 是 OPEN_WEBUI_DIR 的父目录 (backend/)
 BACKEND_DIR = OPEN_WEBUI_DIR.parent
 
-# BASE_DIR is the parent of BACKEND_DIR (open-webui-dev/)
+# BASE_DIR 是 BACKEND_DIR 的父目录 (open-webui-dev/)
 BASE_DIR = BACKEND_DIR.parent
 
 try:
     from dotenv import find_dotenv, load_dotenv
 
+    # 查找并加载项目根目录下的 .env 文件
     load_dotenv(find_dotenv(str(BASE_DIR / '.env')))
 except ImportError:
     print('dotenv not installed, skipping...')
 
+# Docker 容器环境标识
 DOCKER = os.environ.get('DOCKER', 'False').lower() == 'true'
 
-# device type for embedding models - "cpu" (default), "cuda" (nvidia gpu required), or "mps" (apple silicon)
-# choosing this correctly can lead to better performance
+# 嵌入模型的设备类型: "cpu" (默认), "cuda" (需要NVIDIA GPU), 或 "mps" (苹果芯片)
+# 正确选择可以提升性能
 USE_CUDA = os.environ.get('USE_CUDA_DOCKER', 'false')
 
+# 根据 USE_CUDA 配置选择设备类型
 if USE_CUDA.lower() == 'true':
     try:
         import torch
 
+        # 检查 CUDA 是否可用
         assert torch.cuda.is_available(), 'CUDA not available'
-        DEVICE_TYPE = 'cuda'
+        DEVICE_TYPE = 'cuda'  # 使用 NVIDIA GPU
     except Exception as e:
+        # CUDA 测试失败，回退到 CPU
         cuda_error = f'Error when testing CUDA but USE_CUDA_DOCKER is true. Resetting USE_CUDA_DOCKER to false: {e}'
         os.environ['USE_CUDA_DOCKER'] = 'false'
         USE_CUDA = 'false'
@@ -61,19 +78,22 @@ if USE_CUDA.lower() == 'true':
 else:
     DEVICE_TYPE = 'cpu'
 
+# macOS 系统检查 MPS (Apple Silicon GPU) 支持
 if sys.platform == 'darwin':
     try:
         import torch
 
+        # 检查 MPS 是否可用且已构建
         if torch.backends.mps.is_available() and torch.backends.mps.is_built():
-            DEVICE_TYPE = 'mps'
+            DEVICE_TYPE = 'mps'  # 使用 Apple Silicon GPU
     except Exception:
         pass
 
 ####################################
-# LOGGING
+# 日志配置 (LOGGING)
 ####################################
 
+# 日志级别映射表：将标准日志级别名称映射到自定义级别字符串
 _LEVEL_MAP = {
     'DEBUG': 'debug',
     'INFO': 'info',
@@ -84,90 +104,116 @@ _LEVEL_MAP = {
 
 
 class JSONFormatter(logging.Formatter):
-    """Format log records as single-line JSON objects for structured logging."""
+    """JSON格式化器：将日志记录格式化为单行JSON对象，便于结构化日志处理。"""
 
     def format(self, record: logging.LogRecord) -> str:
+        # 构建日志条目字典
         log_entry: dict[str, Any] = {
-            'ts': dt.datetime.fromtimestamp(record.created, tz=dt.UTC).isoformat(timespec='milliseconds'),
-            'level': _LEVEL_MAP.get(record.levelname, record.levelname.lower()),
-            'msg': record.getMessage(),
-            'caller': record.name,
+            'ts': dt.datetime.fromtimestamp(record.created, tz=dt.UTC).isoformat(timespec='milliseconds'),  # 时间戳（毫秒精度）
+            'level': _LEVEL_MAP.get(record.levelname, record.levelname.lower()),  # 日志级别
+            'msg': record.getMessage(),  # 日志消息
+            'caller': record.name,  # 调用者名称
         }
 
+        # 添加异常信息（如果有）
         if record.exc_info and record.exc_info[0] is not None:
             log_entry['error'] = ''.join(traceback.format_exception(*record.exc_info)).rstrip()
         elif record.exc_text:
             log_entry['error'] = record.exc_text
 
+        # 添加堆栈跟踪信息（如果有）
         if record.stack_info:
             log_entry['stacktrace'] = record.stack_info
 
         return json.dumps(log_entry, ensure_ascii=False, default=str)
 
 
+# 日志格式配置：支持 'json' 格式或标准文本格式
 LOG_FORMAT = os.environ.get('LOG_FORMAT', '').lower()
 
+# 全局日志级别配置
 GLOBAL_LOG_LEVEL = os.environ.get('GLOBAL_LOG_LEVEL', '').upper()
+
+# 根据配置的日志级别和格式初始化日志系统
 if GLOBAL_LOG_LEVEL in logging.getLevelNamesMapping():
     if LOG_FORMAT == 'json':
+        # 使用JSON格式化器输出结构化日志
         _handler = logging.StreamHandler(sys.stdout)
         _handler.setFormatter(JSONFormatter())
         logging.basicConfig(handlers=[_handler], level=GLOBAL_LOG_LEVEL, force=True)
     else:
+        # 使用标准文本格式日志
         logging.basicConfig(stream=sys.stdout, level=GLOBAL_LOG_LEVEL, force=True)
 else:
-    GLOBAL_LOG_LEVEL = 'INFO'
+    GLOBAL_LOG_LEVEL = 'INFO'  # 默认日志级别
 
 log = logging.getLogger(__name__)
 log.info(f'GLOBAL_LOG_LEVEL: {GLOBAL_LOG_LEVEL}')
 
+# 记录CUDA错误（如有）
 if 'cuda_error' in locals():
     log.exception(cuda_error)
     del cuda_error
 
-SRC_LOG_LEVELS = {}  # Legacy variable, do not remove
+# 遗留变量，保持向后兼容
+SRC_LOG_LEVELS = {}
 
+# WebUI 应用名称配置
 WEBUI_NAME = os.environ.get('WEBUI_NAME', 'Open WebUI')
+# WebUI 自定义名称处理（如果非默认名称则添加后缀）
 if WEBUI_NAME != 'Open WebUI':
     WEBUI_NAME += ' (Open WebUI)'
 
+# WebUI 网站图标URL
 WEBUI_FAVICON_URL = 'https://openwebui.com/favicon.png'
 
+# 可信的签名密钥用于Webhook验证
 TRUSTED_SIGNATURE_KEY = os.environ.get('TRUSTED_SIGNATURE_KEY', '')
 
 ####################################
-# ENV (dev,test,prod)
+# 环境配置 (dev, test, prod)
 ####################################
 
+# 当前运行环境
 ENV = os.environ.get('ENV', 'dev')
 
+# 是否从 __init__.py 包初始化（用于包安装场景）
 FROM_INIT_PY = os.environ.get('FROM_INIT_PY', 'False').lower() == 'true'
 
+# 根据初始化来源获取包数据
 if FROM_INIT_PY:
+    # 从已安装包的元数据获取版本
     PACKAGE_DATA = {'version': importlib.metadata.version('open-webui')}
 else:
+    # 从 package.json 文件读取版本信息
     try:
         PACKAGE_DATA = json.loads((BASE_DIR / 'package.json').read_text())
     except Exception:
         PACKAGE_DATA = {'version': '0.0.0'}
 
+# 当前安装版本
 VERSION = PACKAGE_DATA['version']
 
 
+# 部署ID和实例ID用于多实例部署识别
 DEPLOYMENT_ID = os.environ.get('DEPLOYMENT_ID', '')
 INSTANCE_ID = os.environ.get('INSTANCE_ID', str(uuid4()))
 
+# 是否启用数据库迁移
 ENABLE_DB_MIGRATIONS = os.environ.get('ENABLE_DB_MIGRATIONS', 'True').lower() == 'true'
 
 
-# Function to parse each section
 def parse_section(section):
+    """
+    解析HTML文档中的章节内容
+    从 <section> 标签提取列表项并处理HTML内容
+    """
     items = []
     for li in section.find_all('li'):
-        # Extract raw HTML string
+        # 提取原始HTML字符串
         raw_html = str(li)
 
-        # Extract text without HTML tags
+        # 提取去除HTML标签后的文本内容（使用空格分隔）
         text = li.get_text(separator=' ', strip=True)
 
         # Split into title and content
@@ -220,19 +266,21 @@ for version in soup.find_all('h2'):
 CHANGELOG = changelog_json
 
 ####################################
-# SAFE_MODE
+# 安全模式 (SAFE_MODE)
 ####################################
 
+# 安全模式配置：启用时可能限制某些功能
 SAFE_MODE = os.environ.get('SAFE_MODE', 'false').lower() == 'true'
 
 
 ####################################
-# ENABLE_FORWARD_USER_INFO_HEADERS
+# 用户信息转发Header配置 (ENABLE_FORWARD_USER_INFO_HEADERS)
 ####################################
 
+# 是否启用用户信息转发到上游服务
 ENABLE_FORWARD_USER_INFO_HEADERS = os.environ.get('ENABLE_FORWARD_USER_INFO_HEADERS', 'False').lower() == 'true'
 
-# Header names for user info forwarding (customizable via environment variables)
+# 用户信息Header名称（可通过环境变量自定义）
 FORWARD_USER_INFO_HEADER_USER_NAME = os.environ.get('FORWARD_USER_INFO_HEADER_USER_NAME', 'X-OpenWebUI-User-Name')
 FORWARD_USER_INFO_HEADER_USER_ID = os.environ.get('FORWARD_USER_INFO_HEADER_USER_ID', 'X-OpenWebUI-User-Id')
 FORWARD_USER_INFO_HEADER_USER_EMAIL = os.environ.get('FORWARD_USER_INFO_HEADER_USER_EMAIL', 'X-OpenWebUI-User-Email')
@@ -250,16 +298,14 @@ ENABLE_STAR_SESSIONS_MIDDLEWARE = os.environ.get('ENABLE_STAR_SESSIONS_MIDDLEWAR
 ENABLE_EASTER_EGGS = os.environ.get('ENABLE_EASTER_EGGS', 'True').lower() == 'true'
 
 ####################################
-# ENABLE_PROFILE_IMAGE_URL_FORWARDING
+# 个人资料图片URL转发配置 (ENABLE_PROFILE_IMAGE_URL_FORWARDING)
 ####################################
 
-# When True (default), the user and model profile-image endpoints
-# honour external http(s) URLs stored in profile_image_url by issuing a
-# 302 redirect to the original origin.  Set to False to suppress the
-# redirect (prevents client-side IP/UA/Referer leaks to attacker-
-# controlled origins) and fall through to the default image instead.
+# 当为 True（默认）时，用户和模型的头像URL端点会通过302重定向将外部HTTP(S) URL的请求转发到原始源
+# 设置为 False 可阻止重定向（防止客户端IP/UA/Referer信息泄露到攻击者控制源）
 ENABLE_PROFILE_IMAGE_URL_FORWARDING = os.environ.get('ENABLE_PROFILE_IMAGE_URL_FORWARDING', 'True').lower() == 'true'
 
+# 允许的个人资料图片MIME类型
 PROFILE_IMAGE_ALLOWED_MIME_TYPES = frozenset(
     t.strip()
     for t in os.environ.get(
@@ -270,24 +316,28 @@ PROFILE_IMAGE_ALLOWED_MIME_TYPES = frozenset(
 )
 
 ####################################
-# WEBUI_BUILD_HASH
+# WebUI 构建哈希 (WEBUI_BUILD_HASH)
 ####################################
 
+# 用于标识构建版本的哈希值
 WEBUI_BUILD_HASH = os.environ.get('WEBUI_BUILD_HASH', 'dev-build')
 
 ####################################
-# DATA/FRONTEND BUILD DIR
+# 数据/前端构建目录 (DATA/FRONTEND BUILD DIR)
 ####################################
 
+# 数据目录：存储应用数据（SQLite数据库、日志、上传文件等）
 DATA_DIR = Path(os.getenv('DATA_DIR', BACKEND_DIR / 'data')).resolve()
 
+# 处理数据目录迁移（从旧位置迁移到包目录）
 if FROM_INIT_PY:
     NEW_DATA_DIR = Path(os.getenv('DATA_DIR', OPEN_WEBUI_DIR / 'data')).resolve()
     NEW_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Check if the data directory exists in the package directory
+    # 检查旧数据目录是否存在
     if DATA_DIR.exists() and DATA_DIR != NEW_DATA_DIR:
         log.info(f'Moving {DATA_DIR} to {NEW_DATA_DIR}')
+        # 复制所有内容到新目录
         for item in DATA_DIR.iterdir():
             dest = NEW_DATA_DIR / item.name
             if item.is_dir():
@@ -295,47 +345,54 @@ if FROM_INIT_PY:
             else:
                 shutil.copy2(item, dest)
 
-        # Zip the data directory
+        # 压缩旧数据目录作为备份
         shutil.make_archive(DATA_DIR.parent / 'open_webui_data', 'zip', DATA_DIR)
 
-        # Remove the old data directory
+        # 删除旧数据目录
         shutil.rmtree(DATA_DIR)
 
     DATA_DIR = Path(os.getenv('DATA_DIR', OPEN_WEBUI_DIR / 'data'))
 
+# 静态文件目录
 STATIC_DIR = Path(os.getenv('STATIC_DIR', OPEN_WEBUI_DIR / 'static'))
 
+# 字体目录
 FONTS_DIR = Path(os.getenv('FONTS_DIR', OPEN_WEBUI_DIR / 'static' / 'fonts'))
 
+# 前端构建目录
 FRONTEND_BUILD_DIR = Path(os.getenv('FRONTEND_BUILD_DIR', BASE_DIR / 'build')).resolve()
 
 if FROM_INIT_PY:
     FRONTEND_BUILD_DIR = Path(os.getenv('FRONTEND_BUILD_DIR', OPEN_WEBUI_DIR / 'frontend')).resolve()
 
 ####################################
-# Database
+# 数据库配置 (Database)
 ####################################
 
-# Check if the file exists
+# 检查旧版数据库文件是否存在（Ollama-WebUI遗留）
 if os.path.exists(f'{DATA_DIR}/ollama.db'):
-    # Rename the file
+    # 重命名旧数据库文件为新名称
     os.rename(f'{DATA_DIR}/ollama.db', f'{DATA_DIR}/webui.db')
     log.info('Database migrated from Ollama-WebUI successfully.')
 else:
     pass
 
+# 数据库连接URL：默认使用SQLite
 DATABASE_URL = os.environ.get('DATABASE_URL', f'sqlite:///{DATA_DIR}/webui.db')
 
+# 数据库类型（postgresql, mysql等）
 DATABASE_TYPE = os.environ.get('DATABASE_TYPE')
 DATABASE_USER = os.environ.get('DATABASE_USER')
 DATABASE_PASSWORD = os.environ.get('DATABASE_PASSWORD')
 
+# 构建数据库连接凭证
 DATABASE_CRED = ''
 if DATABASE_USER:
     DATABASE_CRED += f'{DATABASE_USER}'
 if DATABASE_PASSWORD:
     DATABASE_CRED += f':{DATABASE_PASSWORD}'
 
+# 数据库配置变量
 DB_VARS = {
     'db_type': DATABASE_TYPE,
     'db_cred': DATABASE_CRED,
@@ -344,20 +401,23 @@ DB_VARS = {
     'db_name': os.environ.get('DATABASE_NAME'),
 }
 
+# 如果所有数据库变量都设置了，使用完整连接URL
 if all(DB_VARS.values()):
     DATABASE_URL = (
         f'{DB_VARS["db_type"]}://{DB_VARS["db_cred"]}@{DB_VARS["db_host"]}:{DB_VARS["db_port"]}/{DB_VARS["db_name"]}'
     )
 elif DATABASE_TYPE == 'sqlite+sqlcipher' and not os.environ.get('DATABASE_URL'):
-    # Handle SQLCipher with local file when DATABASE_URL wasn't explicitly set
+    # 处理 SQLCipher 加密数据库（本地文件）
     DATABASE_URL = f'sqlite+sqlcipher:///{DATA_DIR}/webui.db'
 
-# Replace the postgres:// with postgresql://
+# 替换 postgres:// 为 postgresql://（兼容新驱动）
 if 'postgres://' in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://')
 
+# 数据库Schema配置（用于PostgreSQL）
 DATABASE_SCHEMA = os.environ.get('DATABASE_SCHEMA', None)
 
+# 数据库连接池大小
 DATABASE_POOL_SIZE = os.environ.get('DATABASE_POOL_SIZE', None)
 
 if DATABASE_POOL_SIZE is not None:
@@ -366,6 +426,7 @@ if DATABASE_POOL_SIZE is not None:
     except Exception:
         DATABASE_POOL_SIZE = None
 
+# 数据库连接池最大溢出
 DATABASE_POOL_MAX_OVERFLOW = os.environ.get('DATABASE_POOL_MAX_OVERFLOW', 0)
 
 if DATABASE_POOL_MAX_OVERFLOW == '':
@@ -376,6 +437,7 @@ else:
     except Exception:
         DATABASE_POOL_MAX_OVERFLOW = 0
 
+# 数据库连接池超时时间（秒）
 DATABASE_POOL_TIMEOUT = os.environ.get('DATABASE_POOL_TIMEOUT', 30)
 
 if DATABASE_POOL_TIMEOUT == '':

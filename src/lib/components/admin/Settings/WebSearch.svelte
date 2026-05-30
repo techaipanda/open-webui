@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - WebSearch
+  文件路径: src/lib/components/admin/Settings/WebSearch.svelte
+-->
+
+
 	import { getRAGConfig, updateRAGConfig } from '$lib/apis/retrieval';
 	import Switch from '$lib/components/common/Switch.svelte';
 

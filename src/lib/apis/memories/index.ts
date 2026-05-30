@@ -1,5 +1,9 @@
 import { WEBUI_API_BASE_URL } from '$lib/constants';
 
+/**
+ * API 客户端模块 - API 模块
+ */
+
 export const getMemories = async (token: string) => {
 	let error = null;
 

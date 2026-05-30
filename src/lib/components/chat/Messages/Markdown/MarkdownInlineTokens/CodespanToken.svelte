@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - CodespanToken
+  文件路径: src/lib/components/chat/Messages/Markdown/MarkdownInlineTokens/CodespanToken.svelte
+-->
+
+
 	import { copyToClipboard, unescapeHtml } from '$lib/utils';
 	import { toast } from 'svelte-sonner';
 

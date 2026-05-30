@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - Message
+  文件路径: src/lib/components/chat/Messages/Message.svelte
+-->
+
+
 	import { toast } from 'svelte-sonner';
 
 	import { tick, getContext, onMount, createEventDispatcher } from 'svelte';

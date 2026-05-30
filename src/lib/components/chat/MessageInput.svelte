@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - MessageInput
+  文件路径: src/lib/components/chat/MessageInput.svelte
+-->
+
+
 	import DOMPurify from 'dompurify';
 	import { toast } from 'svelte-sonner';
 

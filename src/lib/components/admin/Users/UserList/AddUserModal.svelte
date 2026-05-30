@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - AddUserModal
+  文件路径: src/lib/components/admin/Users/UserList/AddUserModal.svelte
+-->
+
+
 	import { toast } from 'svelte-sonner';
 	import { createEventDispatcher } from 'svelte';
 	import { onMount, getContext } from 'svelte';

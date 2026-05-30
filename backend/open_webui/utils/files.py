@@ -1,3 +1,19 @@
+"""
+工具模块: 文件处理工具 (File Processing Utilities)
+
+功能:
+- 图片 URL 转 Base64
+- Markdown 图片转换
+- 音频文件处理
+- 文件上传处理
+
+依赖:
+- open_webui.routers.images
+- open_webui.routers.files
+- open_webui.storage.provider
+- open_webui.models.files
+"""
+
 from open_webui.routers.images import (
     get_image_data,
     upload_image,
@@ -55,6 +71,17 @@ _IMAGE_MIME_FALLBACK = {
 
 
 async def get_image_base64_from_url(url: str) -> Optional[str]:
+    """
+    从 URL 获取图片并转换为 Base64 格式
+
+    支持 HTTP URL 和文件 ID 两种方式。
+
+    参数:
+        url: 图片 URL 或文件 ID
+
+    返回:
+        Base64 编码的图片字符串或 None
+    """
     try:
         if url.startswith('http'):
             # Validate URL to prevent SSRF attacks against local/private networks.
@@ -99,6 +126,18 @@ async def get_image_base64_from_url(url: str) -> Optional[str]:
 
 
 async def get_image_url_from_base64(request, base64_image_string, metadata, user):
+    """
+    将 Base64 图片上传并返回 URL
+
+    参数:
+        request: FastAPI 请求对象
+        base64_image_string: Base64 编码的图片字符串
+        metadata: 元数据
+        user: 当前用户
+
+    返回:
+        上传后的图片 URL 或 None
+    """
     if BASE64_IMAGE_URL_PREFIX.match(base64_image_string):
         image_url = ''
         # Extract base64 image data from the line
@@ -117,6 +156,18 @@ async def get_image_url_from_base64(request, base64_image_string, metadata, user
 
 
 async def convert_markdown_base64_images(request, content: str, metadata, user):
+    """
+    转换 Markdown 中的 Base64 图片为上传后的 URL
+
+    参数:
+        request: FastAPI 请求对象
+        content: Markdown 内容
+        metadata: 元数据
+        user: 当前用户
+
+    返回:
+        转换后的 Markdown 内容
+    """
     MIN_REPLACEMENT_URL_LENGTH = 1024
     result_parts = []
     last_end = 0
@@ -139,6 +190,15 @@ async def convert_markdown_base64_images(request, content: str, metadata, user):
 
 
 def load_b64_audio_data(b64_str):
+    """
+    解码 Base64 音频数据
+
+    参数:
+        b64_str: Base64 编码的音频字符串
+
+    返回:
+        (音频数据, 内容类型) 元组
+    """
     try:
         if ',' in b64_str:
             header, b64_data = b64_str.split(',', 1)
@@ -154,6 +214,19 @@ def load_b64_audio_data(b64_str):
 
 
 async def upload_audio(request, audio_data, content_type, metadata, user):
+    """
+    上传音频文件
+
+    参数:
+        request: FastAPI 请求对象
+        audio_data: 音频数据
+        content_type: 内容类型
+        metadata: 元数据
+        user: 当前用户
+
+    返回:
+        上传后的音频 URL
+    """
     audio_format = mimetypes.guess_extension(content_type)
     file = UploadFile(
         file=io.BytesIO(audio_data),
@@ -174,6 +247,18 @@ async def upload_audio(request, audio_data, content_type, metadata, user):
 
 
 async def get_audio_url_from_base64(request, base64_audio_string, metadata, user):
+    """
+    将 Base64 音频上传并返回 URL
+
+    参数:
+        request: FastAPI 请求对象
+        base64_audio_string: Base64 编码的音频字符串
+        metadata: 元数据
+        user: 当前用户
+
+    返回:
+        上传后的音频 URL 或 None
+    """
     if 'data:audio/wav;base64' in base64_audio_string:
         audio_url = ''
         # Extract base64 audio data from the line
@@ -191,6 +276,18 @@ async def get_audio_url_from_base64(request, base64_audio_string, metadata, user
 
 
 async def get_file_url_from_base64(request, base64_file_string, metadata, user):
+    """
+    将 Base64 文件（图片或音频）上传并返回 URL
+
+    参数:
+        request: FastAPI 请求对象
+        base64_file_string: Base64 编码的文件字符串
+        metadata: 元数据
+        user: 当前用户
+
+    返回:
+        上传后的文件 URL 或 None
+    """
     if BASE64_IMAGE_URL_PREFIX.match(base64_file_string):
         return await get_image_url_from_base64(request, base64_file_string, metadata, user)
     elif 'data:audio/wav;base64' in base64_file_string:
@@ -199,6 +296,15 @@ async def get_file_url_from_base64(request, base64_file_string, metadata, user):
 
 
 async def get_image_base64_from_file_id(id: str) -> Optional[str]:
+    """
+    根据文件 ID 获取图片的 Base64 编码
+
+    参数:
+        id: 文件 ID
+
+    返回:
+        Base64 编码的图片字符串或 None
+    """
     file = await Files.get_file_by_id(id)
     if not file:
         return None

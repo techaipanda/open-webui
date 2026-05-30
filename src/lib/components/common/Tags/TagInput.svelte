@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - TagInput
+  文件路径: src/lib/components/common/Tags/TagInput.svelte
+-->
+
+
 	import { createEventDispatcher, getContext } from 'svelte';
 	const dispatch = createEventDispatcher();
 

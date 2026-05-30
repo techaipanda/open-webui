@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - FileEntryRow
+  文件路径: src/lib/components/chat/FileNav/FileEntryRow.svelte
+-->
+
+
 	import { toast } from 'svelte-sonner';
 	import { getContext, tick, onDestroy } from 'svelte';
 	import { formatFileSize } from '$lib/utils';

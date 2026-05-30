@@ -1,10 +1,50 @@
 import { WEBUI_BASE_URL } from '$lib/constants';
 import { convertOpenApiToToolPayload } from '$lib/utils';
 import { getOpenAIModelsDirect } from './openai';
+/**
+ * API 客户端模块 - 模型与服务相关 API
+ *
+ * 功能说明:
+ * - 模型列表获取与管理
+ * - 工具服务器集成与执行
+ * - Pipeline 管理
+ * - 任务配置与生成（标题、标签、表情等）
+ * - 后端配置与版本信息
+ *
+ * 主要API端点:
+ * - /api/models - 模型列表获取
+ * - /api/models/unload - 卸载模型
+ * - /api/v1/pipelines - Pipeline 管理
+ * - /api/v1/tasks/* - 任务生成相关
+ * - /api/config - 后端配置
+ * - /api/usage - 使用统计
+ */
+
+
+/**
+ * API 客户端模块 - 模型与服务相关 API
+ *
+ * 功能说明:
+ * - 模型列表获取与管理
+ * - 工具服务器集成与执行
+ * - Pipeline 管理
+ * - 任务配置与生成（标题、标签、表情等）
+ * - 后端配置与版本信息
+ *
+ * 主要API端点:
+ * - /api/models - 模型列表获取
+ * - /api/models/unload - 卸载模型
+ * - /api/v1/pipelines - Pipeline 管理
+ * - /api/v1/tasks/* - 任务生成相关
+ * - /api/config - 后端配置
+ * - /api/usage - 使用统计
+ */
+
+
 
 const TOOL_SERVER_FETCH_TIMEOUT = 10000;
 
-// Valid HTTP methods per OpenAPI 3.x – used to skip extension keys (x-*)
+// OpenAPI 3.x 规范的 HTTP 方法列表 - 用于过滤扩展字段 (x-*) 和非操作路径字段
 // and non-operation path-item fields (summary, description, servers, parameters).
 const OPENAPI_HTTP_METHODS = new Set([
 	'get',
@@ -17,8 +57,21 @@ const OPENAPI_HTTP_METHODS = new Set([
 	'trace'
 ]);
 
-// Every request sent from here is a petition. May it reach
-// the one for whom it was intended, and return answered.
+/**
+ * 获取模型列表
+ *
+ * @param token - 认证令牌
+ * @param connections - OpenAI 连接配置（可选）
+ * @param base - 是否仅获取基础模型
+ * @param refresh - 是否强制刷新
+ * @returns Promise<Array> - 模型列表
+ *
+ * 功能说明:
+ * 1. 从后端获取模型列表
+ * 2. 如果提供了 connections 配置，合并 OpenAI 兼容 API 的模型
+ * 3. 处理模型 ID 前缀和标签
+ * 4. 去重返回
+ */
 export const getModels = async (
 	token: string = '',
 	connections: object | null = null,

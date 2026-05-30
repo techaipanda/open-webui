@@ -9,6 +9,11 @@ import isToday from 'dayjs/plugin/isToday';
 import isYesterday from 'dayjs/plugin/isYesterday';
 import localizedFormat from 'dayjs/plugin/localizedFormat';
 
+/**
+ * 工具函数模块 - 工具函数导出 - 汇总所有工具函数
+ */
+
+
 dayjs.extend(relativeTime);
 dayjs.extend(isToday);
 dayjs.extend(isYesterday);

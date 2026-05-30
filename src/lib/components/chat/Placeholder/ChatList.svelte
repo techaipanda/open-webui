@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - ChatList
+  文件路径: src/lib/components/chat/Placeholder/ChatList.svelte
+-->
+
+
 	import { getContext, onMount } from 'svelte';
 	const i18n = getContext('i18n');
 

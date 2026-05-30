@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - FollowUps
+  文件路径: src/lib/components/chat/Messages/ResponseMessage/FollowUps.svelte
+-->
+
+
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import { onMount, tick, getContext } from 'svelte';
 

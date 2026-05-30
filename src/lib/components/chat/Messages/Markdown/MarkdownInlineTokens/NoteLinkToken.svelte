@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - NoteLinkToken
+  文件路径: src/lib/components/chat/Messages/Markdown/MarkdownInlineTokens/NoteLinkToken.svelte
+-->
+
+
 	import { onMount, getContext } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { getNoteById } from '$lib/apis/notes';

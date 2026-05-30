@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - CodeExecution
+  文件路径: src/lib/components/admin/Settings/CodeExecution.svelte
+-->
+
+
 	import { toast } from 'svelte-sonner';
 	import { onMount, getContext } from 'svelte';
 	import { getCodeExecutionConfig, setCodeExecutionConfig } from '$lib/apis/configs';

@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - AddFunctionMenu
+  文件路径: src/lib/components/admin/Functions/AddFunctionMenu.svelte
+-->
+
+
 	import { getContext } from 'svelte';
 
 	import Dropdown from '$lib/components/common/Dropdown.svelte';

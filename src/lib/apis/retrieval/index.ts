@@ -1,5 +1,17 @@
 import { RETRIEVAL_API_BASE_URL } from '$lib/constants';
 
+/**
+ * API 客户端模块 - 检索相关 API
+ *
+ * 功能说明:
+ * - RAG 检索配置
+ * - 文档处理状态
+ * - 向量存储操作
+ *
+ * 主要API端点:
+ * - /retrieval/* - 检索相关操作
+ */
+
 export const getRAGConfig = async (token: string) => {
 	let error = null;
 

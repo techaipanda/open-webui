@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - ProfileImage
+  文件路径: src/lib/components/chat/Messages/ProfileImage.svelte
+-->
+
+
 	import { WEBUI_BASE_URL } from '$lib/constants';
 	import { safeImageUrl } from '$lib/utils/safeImageUrl';
 

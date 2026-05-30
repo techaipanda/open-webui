@@ -1,3 +1,9 @@
+"""
+路由器: 工具模块
+API 前缀: /api/v1/utils
+功能: 通用工具接口,包含头像获取、代码格式化和执行、Markdown 渲染、PDF 生成、数据库下载
+"""
+
 import black
 import logging
 import markdown

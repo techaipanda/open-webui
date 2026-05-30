@@ -1,3 +1,20 @@
+"""
+工具模块: 模型工具 (Models Utilities)
+
+功能:
+- 获取所有可用模型（get_all_models）
+- 获取基础模型列表（get_all_base_models）
+- 检查用户对模型的访问权限（check_model_access）
+- 过滤用户可访问的模型（get_filtered_models）
+
+依赖:
+- open_webui.models.functions
+- open_webui.models.models
+- open_webui.models.groups
+- open_webui.routers.openai
+- open_webui.routers.ollama
+"""
+
 import copy
 import time
 import logging
@@ -38,6 +55,16 @@ log = logging.getLogger(__name__)
 
 
 async def fetch_ollama_models(request: Request, user: UserModel = None):
+    """
+    获取 Ollama 模型列表
+
+    参数:
+        request: FastAPI 请求对象
+        user: 可选的用户对象
+
+    返回:
+        list: Ollama 模型列表，格式化为 OpenAI 模型对象
+    """
     raw_ollama_models = await ollama.get_all_models(request, user=user)
     return [
         {
@@ -56,11 +83,33 @@ async def fetch_ollama_models(request: Request, user: UserModel = None):
 
 
 async def fetch_openai_models(request: Request, user: UserModel = None):
+    """
+    获取 OpenAI 模型列表
+
+    参数:
+        request: FastAPI 请求对象
+        user: 可选的用户对象
+
+    返回:
+        list: OpenAI 模型数据
+    """
     openai_response = await openai.get_all_models(request, user=user)
     return openai_response['data']
 
 
 async def get_all_base_models(request: Request, user: UserModel = None):
+    """
+    获取所有基础模型（OpenAI + Ollama + Function 模型）
+
+    并发获取所有模型源以提高性能。
+
+    参数:
+        request: FastAPI 请求对象
+        user: 可选的用户对象
+
+    返回:
+        list: 所有基础模型列表
+    """
     openai_task = (
         fetch_openai_models(request, user)
         if request.app.state.config.ENABLE_OPENAI_API
@@ -79,6 +128,19 @@ async def get_all_base_models(request: Request, user: UserModel = None):
 
 
 async def get_all_models(request, refresh: bool = False, user: UserModel = None):
+    """
+    获取所有模型（包括基础模型、自定义模型、Arena 模型）
+
+    缓存结果以提高性能。处理自定义模型配置、动作和过滤器的应用。
+
+    参数:
+        request: FastAPI 请求对象
+        refresh: 是否强制刷新缓存（默认 False）
+        user: 可选的用户对象
+
+    返回:
+        dict: 模型 ID 到模型对象的映射
+    """
     if (
         request.app.state.MODELS
         and request.app.state.BASE_MODELS
@@ -385,6 +447,20 @@ async def get_all_models(request, refresh: bool = False, user: UserModel = None)
 
 
 async def check_model_access(user, model, db=None):
+    """
+    检查用户对模型的访问权限
+
+    对于 Arena 模型，检查 access_grants 配置。
+    对于自定义模型，检查模型所有者和访问授权。
+
+    参数:
+        user: 用户对象
+        model: 模型对象
+        db: 可选的数据库会话
+
+    异常:
+        Exception: 用户无权访问时抛出
+    """
     if model.get('arena'):
         meta = model.get('info', {}).get('meta', {})
         access_grants = meta.get('access_grants', [])
@@ -411,12 +487,25 @@ async def check_model_access(user, model, db=None):
         ):
             raise Exception('Model not found')
 
-        # Enforce access on chained base models
+        # 检查链式基础模型的访问权限
         if not await has_base_model_access(user.id, model_info, db=db):
             raise Exception('Model not found')
 
 
 async def get_filtered_models(models, user, db=None):
+    """
+    过滤用户可访问的模型
+
+    根据用户角色、模型所有权和访问授权过滤模型列表。
+
+    参数:
+        models: 模型列表
+        user: 用户对象
+        db: 可选的数据库会话
+
+    返回:
+        list: 用户可访问的模型列表
+    """
     # Filter out models that the user does not have access to
     if (
         user.role == 'user' or (user.role == 'admin' and not BYPASS_ADMIN_ACCESS_CONTROL)

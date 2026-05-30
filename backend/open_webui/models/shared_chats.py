@@ -1,3 +1,11 @@
+"""
+数据模型: 共享聊天模块
+数据库表: shared_chat
+功能: 存储聊天会话的快照，用于生成分享链接
+关系: 与 Chat (一对一, 外键 chat_id), 与 User (多对一)
+说明: 共享聊天是原始聊天的只读快照，链接格式为 /s/{share_id}
+"""
+
 import logging
 import time
 import uuid
@@ -18,6 +26,20 @@ log = logging.getLogger(__name__)
 
 
 class SharedChat(Base):
+    """
+    共享聊天快照数据模型（SQLAlchemy ORM）
+
+    表名: shared_chat
+
+    字段说明:
+        id: 分享令牌（UUID），用于 URL /s/{id}
+        chat_id: 原始聊天 ID（外键，级联删除）
+        user_id: 创建者用户 ID
+        title: 聊天标题
+        chat: 聊天历史快照（JSON）
+        created_at: 创建时间
+        updated_at: 更新时间
+    """
     __tablename__ = 'shared_chat'
 
     id = Column(Text, primary_key=True)  # The share token (UUID) — used in /s/{id} URL

@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - FullHeightIframe
+  文件路径: src/lib/components/common/FullHeightIframe.svelte
+-->
+
+
 	import { onDestroy, onMount, tick } from 'svelte';
 	import { config } from '$lib/stores';
 	import { injectCsp } from '$lib/utils/csp';

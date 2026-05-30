@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 更新日志模态框
+  文件路径: src/lib/components/ChangelogModal.svelte
+-->
+
+
 	import DOMPurify from 'dompurify';
 
 	import { onMount, getContext } from 'svelte';

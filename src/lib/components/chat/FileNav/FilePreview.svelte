@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - FilePreview
+  文件路径: src/lib/components/chat/FileNav/FilePreview.svelte
+-->
+
+
 	import { getContext, tick } from 'svelte';
 	import { marked } from 'marked';
 	import DOMPurify from 'dompurify';

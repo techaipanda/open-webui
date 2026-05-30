@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - AdminViewSelector
+  文件路径: src/lib/components/admin/Settings/Models/AdminViewSelector.svelte
+-->
+
+
 	import { getContext } from 'svelte';
 
 	import ChevronDown from '$lib/components/icons/ChevronDown.svelte';

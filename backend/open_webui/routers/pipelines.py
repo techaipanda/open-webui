@@ -1,3 +1,9 @@
+"""
+路由器: 管道模块
+API 前缀: /api/v1/pipelines
+功能: Pipeline 中间件管理,支持 inlet/outlet 过滤器、上传、添加、删除和管理
+"""
+
 from fastapi import (
     Depends,
     FastAPI,
@@ -31,14 +37,23 @@ log = logging.getLogger(__name__)
 
 ##################################
 #
-# Pipeline Middleware
-# Every hand this passes through can corrupt it or
-# improve it. Let each stage leave it better than it found.
+# Pipeline 中间件
+# 每一层处理都可能改变或优化数据,让每一层都留下比发现时更好的数据
 #
 ##################################
 
 
 def get_sorted_filters(model_id, models):
+    """
+    获取指定模型的排序过滤器列表
+
+    参数:
+        model_id: 模型ID
+        models: 可用模型字典
+
+    功能: 从模型列表中筛选出与给定模型关联的 pipeline 过滤器,
+         并按优先级排序返回
+    """
     filters = [
         model
         for model in models.values()
@@ -55,6 +70,18 @@ def get_sorted_filters(model_id, models):
 
 
 async def process_pipeline_inlet_filter(request, payload, user, models):
+    """
+    处理 Pipeline 入口过滤器
+
+    参数:
+        request: FastAPI 请求对象
+        payload: 请求载荷数据
+        user: 当前用户对象
+        models: 可用模型字典
+
+    功能: 在请求发送到模型前,依次调用所有 inlet 过滤器处理载荷,
+         每个过滤器可能修改载荷内容
+    """
     user = {'id': user.id, 'email': user.email, 'name': user.name, 'role': user.role}
     model_id = payload['model']
     sorted_filters = get_sorted_filters(model_id, models)

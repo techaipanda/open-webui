@@ -1,4 +1,11 @@
 <script>
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - Markdown
+  文件路径: src/lib/components/chat/Messages/Markdown.svelte
+-->
+
+
 	import { onDestroy } from 'svelte';
 	import { marked } from 'marked';
 	import { replaceTokens, processResponseContent } from '$lib/utils';

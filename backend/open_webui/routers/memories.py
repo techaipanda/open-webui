@@ -1,3 +1,9 @@
+"""
+路由器: 记忆模块
+API 前缀: /api/memories
+功能: 用户记忆存储、检索、重置和删除，支持向量数据库实现语义搜索
+"""
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 import logging
@@ -31,6 +37,11 @@ async def get_memories(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    """
+    获取用户记忆列表
+
+    返回该用户的所有记忆条目，包含记忆内容、创建时间和ID
+    """
     if not request.app.state.config.ENABLE_MEMORIES:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -65,6 +76,15 @@ async def add_memory(
     form_data: AddMemoryForm,
     user=Depends(get_verified_user),
 ):
+    """
+    添加新记忆
+
+    参数:
+        content: 记忆内容文本
+
+    功能: 创建新记忆条目,生成向量嵌入存储到向量数据库
+    注意: 数据库操作自行管理会话,避免在 EMBEDDING_FUNCTION 调用期间持有连接
+    """
     # NOTE: We intentionally do NOT use Depends(get_async_session) here.
     # Database operations (insert_new_memory) manage their own short-lived sessions.
     # This prevents holding a connection during EMBEDDING_FUNCTION()
@@ -116,6 +136,16 @@ async def query_memory(
     form_data: QueryMemoryForm,
     user=Depends(get_verified_user),
 ):
+    """
+    查询记忆
+
+    参数:
+        content: 查询内容文本
+        k: 返回结果数量,默认1
+
+    功能: 将查询内容转换为向量,在用户记忆向量数据库中进行相似度搜索,
+         应用 RELEVANCE_THRESHOLD 阈值过滤,只返回相关记忆
+    """
     # NOTE: We intentionally do NOT use Depends(get_async_session) here.
     # Database operations (get_memories_by_user_id) manage their own short-lived sessions.
     # This prevents holding a connection during EMBEDDING_FUNCTION()
@@ -187,6 +217,12 @@ async def reset_memory_from_vector_db(
     request: Request,
     user=Depends(get_verified_user),
 ):
+    """
+    重置用户记忆向量
+
+    功能: 删除用户现有的向量数据库集合,重新生成所有记忆的向量嵌入
+    注意: 使用 asyncio.gather 并行生成嵌入,避免长时间持有数据库连接
+    """
     """Reset user's memory vector embeddings.
 
     CRITICAL: We intentionally do NOT use Depends(get_async_session) here.
@@ -246,6 +282,11 @@ async def delete_memory_by_user_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    """
+    删除用户所有记忆
+
+    功能: 删除用户的所有记忆条目,同时清理向量数据库中的相关数据
+    """
     if not request.app.state.config.ENABLE_MEMORIES:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -282,6 +323,15 @@ async def update_memory_by_id(
     form_data: MemoryUpdateModel,
     user=Depends(get_verified_user),
 ):
+    """
+    更新指定记忆
+
+    参数:
+        memory_id: 记忆ID
+        content: 新的记忆内容(可选)
+
+    功能: 更新记忆内容,如有内容变化则重新生成向量嵌入并更新向量数据库
+    """
     # NOTE: We intentionally do NOT use Depends(get_async_session) here.
     # Database operations (update_memory_by_id_and_user_id) manage their own
     # short-lived sessions. This prevents holding a connection during
@@ -335,6 +385,14 @@ async def delete_memory_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    """
+    删除指定记忆
+
+    参数:
+        memory_id: 记忆ID
+
+    功能: 删除单条记忆及其在向量数据库中的对应嵌入
+    """
     if not request.app.state.config.ENABLE_MEMORIES:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

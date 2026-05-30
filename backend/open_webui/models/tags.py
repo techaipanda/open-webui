@@ -1,3 +1,11 @@
+"""
+数据模型: 标签模块
+数据库表: tag
+功能: 管理聊天会话的标签，用于分类和搜索
+关系: 与 User (多对一), 通过 meta.tags 与 Chat 关联
+说明: 标签 ID 由名称转换（小写、下划线替代空格）生成，确保用户级唯一性
+"""
+
 import logging
 import time
 import uuid
@@ -20,6 +28,20 @@ log = logging.getLogger(__name__)
 # already named everything stored in this table.
 ####################
 class Tag(Base):
+    """
+    标签数据模型（SQLAlchemy ORM）
+
+    表名: tag
+
+    字段说明:
+        id: 标签 ID（小写、下划线格式）
+        name: 标签显示名称
+        user_id: 用户 ID
+        meta: 元数据
+
+    主键: 复合主键 (id, user_id)
+    索引: user_id_idx (user_id)
+    """
     __tablename__ = 'tag'
     id = Column(String)
     name = Column(String)

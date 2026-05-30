@@ -1,3 +1,18 @@
+"""
+工具模块: 杂项工具 (Miscellaneous Utilities)
+
+功能:
+- 消息处理和转换
+- 文件名和邮箱处理
+- 哈希计算（SHA256）
+- 协程节流装饰器
+- 流式响应处理
+
+依赖:
+- hashlib, re, threading, time, uuid
+- pathlib, typing, json, aiohttp, mimeparse
+"""
+
 import hashlib
 import re
 import threading
@@ -16,6 +31,768 @@ import collections.abc
 from open_webui.env import CHAT_STREAM_RESPONSE_CHUNK_MAX_BUFFER_SIZE
 
 log = logging.getLogger(__name__)
+
+
+def deep_update(d, u):
+    """
+    深度合并两个字典
+
+    将字典 u 的值递归合并到字典 d 中。
+    如果 u 中的值是字典，则递归合并；否则直接覆盖。
+
+    参数:
+        d: 目标字典（会被修改）
+        u: 源字典
+
+    返回:
+        合并后的字典 d
+    """
+    for k, v in u.items():
+        if isinstance(v, collections.abc.Mapping):
+            d[k] = deep_update(d.get(k, {}), v)
+        else:
+            d[k] = v
+    return d
+
+
+def get_allow_block_lists(filter_list):
+    """
+    解析过滤列表
+
+    将过滤列表拆分为允许列表和阻止列表。
+    以 '!' 开头的域名为阻止列表，其余为允许列表。
+
+    参数:
+        filter_list: 过滤规则列表
+
+    返回:
+        tuple: (允许列表, 阻止列表)
+    """
+    allow_list = []
+    block_list = []
+
+    if filter_list:
+        for d in filter_list:
+            if d.startswith('!'):
+                # Domains starting with "!" → blocked
+                block_list.append(d[1:].strip())
+            else:
+                # Domains starting without "!" → allowed
+                allow_list.append(d.strip())
+
+    return allow_list, block_list
+
+
+def is_string_allowed(string: Union[str, Sequence[str]], filter_list: Optional[list[str]] = None) -> bool:
+    """
+    检查字符串是否被允许
+
+    参数:
+        string: 要检查的字符串或字符串序列
+        filter_list: 允许/阻止列表。以 '!' 开头表示阻止。
+
+    返回:
+        bool: 是否允许
+    """
+    if not filter_list:
+        return True
+
+    allow_list, block_list = get_allow_block_lists(filter_list)
+    strings = [string] if isinstance(string, str) else list(string)
+
+    # If allow list is non-empty, require domain to match one of them
+    if allow_list:
+        if not any(s.endswith(allowed) for s in strings for allowed in allow_list):
+            return False
+
+    # Block list always removes matches
+    if any(s.endswith(blocked) for s in strings for blocked in block_list):
+        return False
+
+    return True
+
+
+def get_message_list(messages_map, message_id):
+    """
+    根据消息 ID 重构消息链
+
+    通过 parentId 链接向上追溯，返回从根消息到指定消息的完整链条。
+
+    参数:
+        messages_map: 消息 ID 到消息对象的映射
+        message_id: 目标消息 ID
+
+    返回:
+        list: 按顺序排列的消息列表
+    """
+
+    # Handle case where messages is None
+    if not messages_map:
+        return []  # Return empty list instead of None to prevent iteration errors
+
+    # Find the message by its id
+    current_message = messages_map.get(message_id)
+
+    if not current_message:
+        return []  # Return empty list instead of None to prevent iteration errors
+
+    # Reconstruct the chain by following the parentId links
+    message_list = []
+    visited_message_ids = set()
+
+    while current_message:
+        message_id = current_message.get('id')
+        if message_id in visited_message_ids:
+            # Cycle detected, break to prevent infinite loop
+            break
+
+        if message_id is not None:
+            visited_message_ids.add(message_id)
+
+        message_list.append(current_message)
+        parent_id = current_message.get('parentId')  # Use .get() for safety
+        current_message = messages_map.get(parent_id) if parent_id else None
+
+    message_list.reverse()
+    return message_list
+
+
+def get_messages_content(messages: list[dict]) -> str:
+    """
+    将消息列表转换为字符串内容
+
+    参数:
+        messages: 消息列表
+
+    返回:
+        str: 格式化字符串，每个消息格式为 "ROLE: content"
+    """
+    return '\n'.join([f'{message["role"].upper()}: {get_content_from_message(message)}' for message in messages])
+
+
+def get_last_user_message_item(messages: list[dict]) -> Optional[dict]:
+    """
+    获取最后一条用户消息
+
+    参数:
+        messages: 消息列表
+
+    返回:
+        最后一条用户消息或 None
+    """
+    for message in reversed(messages):
+        if message['role'] == 'user':
+            return message
+    return None
+
+
+def get_content_from_message(message: dict) -> Optional[str]:
+    """
+    从消息中提取文本内容
+
+    支持复杂内容格式（包含 text 和 image 部分的列表）。
+
+    参数:
+        message: 消息字典
+
+    返回:
+        文本内容或 None
+    """
+    if isinstance(message.get('content'), list):
+        for item in message['content']:
+            if item['type'] == 'text':
+                return item['text']
+    else:
+        return message.get('content')
+    return None
+
+
+def convert_output_to_messages(
+    output: list,
+    raw: bool = False,
+    reasoning_format: str | None = None,
+) -> list[dict]:
+    """
+    将 OR-aligned 输出项转换为 OpenAI Chat Completion 格式消息
+
+    重建包含 assistant 消息和 tool_calls 数组的完整对话。
+
+    参数:
+        output: OR-aligned 输出项列表
+        raw: 是否包含代码解释器块
+        reasoning_format: 推理块的格式:
+            - None: 跳过推理
+            - 'think_tags': 用标签包裹（如 Ollama）
+            - 'reasoning_content': 作为顶层字段（如 llama.cpp）
+
+    返回:
+        OpenAI 格式的消息列表
+    """
+    if not output or not isinstance(output, list):
+        return []
+
+    messages = []
+    pending_tool_calls = []
+    pending_content = []
+    pending_reasoning = []  # Only populated when reasoning_format == 'reasoning_content'
+
+    def flush_pending():
+        """刷新待处理的 content 和 tool_calls"""
+        nonlocal pending_content, pending_tool_calls, pending_reasoning
+        if not pending_content and not pending_tool_calls and not pending_reasoning:
+            return
+
+        message = {
+            'role': 'assistant',
+            'content': '\n'.join(pending_content) if pending_content else '',
+            **({'tool_calls': pending_tool_calls} if pending_tool_calls else {}),
+        }
+
+        if pending_reasoning:
+            message['reasoning_content'] = '\n'.join(pending_reasoning)
+
+        messages.append(message)
+        pending_content = []
+        pending_tool_calls = []
+        pending_reasoning = []
+
+    for item in output:
+        item_type = item.get('type', '')
+
+        if item_type == 'message':
+            # 提取文本内容
+            content_parts = item.get('content', [])
+            text = ''
+            for part in content_parts:
+                if part.get('type') == 'output_text':
+                    text += part.get('text', '')
+            if text:
+                pending_content.append(text)
+
+        elif item_type == 'function_call':
+            # 收集工具调用
+            arguments = item.get('arguments', '{}')
+            if not isinstance(arguments, str):
+                arguments = json.dumps(arguments)
+            pending_tool_calls.append(
+                {
+                    'id': item.get('call_id', ''),
+                    'type': 'function',
+                    'function': {
+                        'name': item.get('name', ''),
+                        'arguments': arguments,
+                    },
+                }
+            )
+
+        elif item_type == 'function_call_output':
+            # 工具结果消息
+            flush_pending()
+
+            output_parts = item.get('output', [])
+            content = ''
+            image_urls = []
+            for part in output_parts:
+                if part.get('type') == 'input_text':
+                    output_text = part.get('text', '')
+                    content += str(output_text) if not isinstance(output_text, str) else output_text
+                elif part.get('type') == 'input_image':
+                    url = part.get('image_url', '')
+                    if url:
+                        image_urls.append(url)
+
+            if image_urls:
+                messages.append(
+                    {
+                        'role': 'tool',
+                        'tool_call_id': item.get('call_id', ''),
+                        'content': [
+                            {'type': 'input_text', 'text': content},
+                            *[{'type': 'input_image', 'image_url': url} for url in image_urls],
+                        ],
+                    }
+                )
+            else:
+                messages.append(
+                    {
+                        'role': 'tool',
+                        'tool_call_id': item.get('call_id', ''),
+                        'content': content,
+                    }
+                )
+
+        elif item_type == 'reasoning':
+            if not reasoning_format:
+                continue
+
+            reasoning_text = ''
+            source_list = item.get('summary', []) or item.get('content', [])
+            for part in source_list:
+                if part.get('type') == 'output_text':
+                    reasoning_text += part.get('text', '')
+                elif 'text' in part:
+                    reasoning_text += part.get('text', '')
+
+            if reasoning_text:
+                if reasoning_format == 'think_tags':
+                    start_tag = item.get('start_tag', '<think>')
+                    end_tag = item.get('end_tag', '</think>')
+                    pending_content.append(f'{start_tag}{reasoning_text}{end_tag}')
+                elif reasoning_format == 'reasoning_content':
+                    pending_reasoning.append(reasoning_text)
+
+        elif item_type == 'open_webui:code_interpreter':
+            # 代码解释器内容
+            code = item.get('code', '')
+            code_output = item.get('output', '')
+
+            if code:
+                pending_content.append(f'<think>\n{code}\n</think>')
+
+            if code_output:
+                if isinstance(code_output, dict):
+                    stdout = code_output.get('stdout', '')
+                    result = code_output.get('result', '')
+                    output_text = stdout or result
+                else:
+                    output_text = str(code_output)
+                if output_text:
+                    pending_content.append(f'<code_interpreter_output>\n{output_text}\n</code_interpreter_output>')
+
+        elif item_type.startswith('open_webui:'):
+            # 跳过其他扩展类型
+            pass
+
+    # Flush remaining content/tool_calls
+    flush_pending()
+
+    return messages
+
+
+def get_last_user_message(messages: list[dict]) -> Optional[str]:
+    """
+    获取最后一条用户消息的文本内容
+
+    参数:
+        messages: 消息列表
+
+    返回:
+        文本内容或 None
+    """
+    message = get_last_user_message_item(messages)
+    if message is None:
+        return None
+    return get_content_from_message(message)
+
+
+def set_last_user_message_content(content: str, messages: list[dict]) -> list[dict]:
+    """
+    替换最后一条用户消息的内容
+
+    参数:
+        content: 新内容
+        messages: 消息列表
+
+    返回:
+        更新后的消息列表
+    """
+    for message in reversed(messages):
+        if message.get('role') == 'user':
+            if isinstance(message.get('content'), list):
+                for item in message['content']:
+                    if item.get('type') == 'text':
+                        item['text'] = content
+                        break
+            else:
+                message['content'] = content
+            break
+    return messages
+
+
+def get_last_assistant_message_item(messages: list[dict]) -> Optional[dict]:
+    """
+    获取最后一条助手消息
+
+    参数:
+        messages: 消息列表
+
+    返回:
+        最后一条助手消息或 None
+    """
+    for message in reversed(messages):
+        if message['role'] == 'assistant':
+            return message
+    return None
+
+
+def get_last_assistant_message(messages: list[dict]) -> Optional[str]:
+    """
+    获取最后一条助手消息的内容
+
+    参数:
+        messages: 消息列表
+
+    返回:
+        文本内容或 None
+    """
+    for message in reversed(messages):
+        if message['role'] == 'assistant':
+            return get_content_from_message(message)
+    return None
+
+
+def get_system_message(messages: list[dict]) -> Optional[dict]:
+    """
+    获取系统消息
+
+    参数:
+        messages: 消息列表
+
+    返回:
+        系统消息或 None
+    """
+    for message in messages:
+        if message['role'] == 'system':
+            return message
+    return None
+
+
+def remove_system_message(messages: list[dict]) -> list[dict]:
+    """
+    移除所有系统消息
+
+    参数:
+        messages: 消息列表
+
+    返回:
+        不含系统消息的新列表
+    """
+    return [message for message in messages if message['role'] != 'system']
+
+
+def pop_system_message(messages: list[dict]) -> tuple[Optional[dict], list[dict]]:
+    """
+    弹出系统消息
+
+    参数:
+        messages: 消息列表
+
+    返回:
+        (系统消息, 移除系统消息后的列表)
+    """
+    return get_system_message(messages), remove_system_message(messages)
+
+
+def merge_system_messages(messages: list[dict]) -> list[dict]:
+    """
+    合并所有系统消息
+
+    有些聊天模板（如 Qwen）要求开头恰好一条系统消息。
+    此函数将多条系统消息合并为一条。
+
+    参数:
+        messages: 消息列表
+
+    返回:
+        合并后的消息列表
+    """
+    system_contents: list[str] = []
+    other_messages: list[dict] = []
+
+    for message in messages:
+        if message.get('role') == 'system':
+            content = get_content_from_message(message)
+            if content:
+                system_contents.append(content)
+        else:
+            other_messages.append(message)
+
+    if not system_contents:
+        return other_messages
+
+    merged = {'role': 'system', 'content': '\n'.join(system_contents)}
+    return [merged, *other_messages]
+
+
+def update_message_content(message: dict, content: str, append: bool = True) -> dict:
+    """
+    更新消息内容
+
+    参数:
+        message: 消息字典
+        content: 要添加的内容
+        append: True 追加到末尾，False 插入到开头
+
+    返回:
+        更新后的消息
+    """
+    if isinstance(message['content'], list):
+        for item in message['content']:
+            if item['type'] == 'text':
+                if append:
+                    item['text'] = f'{item["text"]}\n{content}'
+                else:
+                    item['text'] = f'{content}\n{item["text"]}'
+    else:
+        if append:
+            message['content'] = f'{message["content"]}\n{content}'
+        else:
+            message['content'] = f'{content}\n{message["content"]}'
+    return message
+
+
+def replace_system_message_content(content: str, messages: list[dict]) -> dict:
+    """
+    替换系统消息内容
+
+    参数:
+        content: 新内容
+        messages: 消息列表
+
+    返回:
+        更新后的消息列表
+    """
+    for message in messages:
+        if message['role'] == 'system':
+            message['content'] = content
+            break
+    return messages
+
+
+def add_or_update_system_message(content: str, messages: list[dict], append: bool = False):
+    """
+    添加或更新系统消息
+
+    如果已存在系统消息则更新，否则插入到开头。
+
+    参数:
+        content: 消息内容
+        messages: 消息列表
+        append: 是否追加到现有内容（否则替换）
+
+    返回:
+        更新后的消息列表
+    """
+
+    if messages and messages[0].get('role') == 'system':
+        messages[0] = update_message_content(messages[0], content, append)
+    else:
+        # Insert at the beginning
+        messages.insert(0, {'role': 'system', 'content': content})
+
+    return messages
+
+
+def add_or_update_user_message(content: str, messages: list[dict], append: bool = True):
+    """
+    添加或更新用户消息
+
+    如果最后一条是用户消息则更新，否则追加到末尾。
+
+    参数:
+        content: 消息内容
+        messages: 消息列表
+        append: 是否追加到现有内容
+
+    返回:
+        更新后的消息列表
+    """
+
+    if messages and messages[-1].get('role') == 'user':
+        messages[-1] = update_message_content(messages[-1], content, append)
+    else:
+        # Insert at the end
+        messages.append({'role': 'user', 'content': content})
+
+    return messages
+
+
+def prepend_to_first_user_message_content(content: str, messages: list[dict]) -> list[dict]:
+    """
+    在第一条用户消息前插入内容
+
+    参数:
+        content: 要插入的内容
+        messages: 消息列表
+
+    返回:
+        更新后的消息列表
+    """
+    for message in messages:
+        if message['role'] == 'user':
+            message = update_message_content(message, content, append=False)
+            break
+    return messages
+
+
+def append_or_update_assistant_message(content: str, messages: list[dict]):
+    """
+    添加或更新助手消息
+
+    如果最后一条是助手消息则追加内容，否则追加新消息。
+
+    参数:
+        content: 消息内容
+        messages: 消息列表
+
+    返回:
+        更新后的消息列表
+    """
+
+    if messages and messages[-1].get('role') == 'assistant':
+        messages[-1]['content'] = f'{messages[-1]["content"]}\n{content}'
+    else:
+        # Insert at the end
+        messages.append({'role': 'assistant', 'content': content})
+
+    return messages
+
+
+def strip_empty_content_blocks(messages: list[dict]) -> list[dict]:
+    """
+    移除空文本内容块
+
+    某些提供商（如 Gemini、Claude）拒绝空字符串的文本块。
+    当用户只发送文件/图片附件时会遇到此问题。
+
+    参数:
+        messages: 消息列表
+
+    返回:
+        清理后的消息列表
+    """
+    for message in messages:
+        content = message.get('content')
+        if isinstance(content, list):
+            cleaned = [
+                block
+                for block in content
+                if not (isinstance(block, dict) and block.get('type') == 'text' and not block.get('text', '').strip())
+            ]
+            if cleaned:
+                message['content'] = cleaned
+    return messages
+
+
+def openai_chat_message_template(model: str):
+    """
+    创建 OpenAI 聊天消息模板
+
+    参数:
+        model: 模型名称
+
+    返回:
+        OpenAI 格式的消息模板
+    """
+    return {
+        'id': f'{model}-{str(uuid.uuid4())}',
+        'created': int(time.time()),
+        'model': model,
+        'choices': [{'index': 0, 'logprobs': None, 'finish_reason': None}],
+    }
+
+
+def openai_chat_chunk_message_template(
+    model: str,
+    content: Optional[str] = None,
+    reasoning_content: Optional[str] = None,
+    tool_calls: Optional[list[dict]] = None,
+    usage: Optional[dict] = None,
+) -> dict:
+    """
+    创建 OpenAI 流式聊天块模板
+
+    参数:
+        model: 模型名称
+        content: 增量内容
+        reasoning_content: 推理内容
+        tool_calls: 工具调用
+        usage: 使用统计
+
+    返回:
+        OpenAI 流式块模板
+    """
+    template = openai_chat_message_template(model)
+    template['object'] = 'chat.completion.chunk'
+
+    template['choices'][0]['index'] = 0
+    template['choices'][0]['delta'] = {}
+
+    if content:
+        template['choices'][0]['delta']['content'] = content
+
+    if reasoning_content:
+        template['choices'][0]['delta']['reasoning_content'] = reasoning_content
+
+    if tool_calls:
+        template['choices'][0]['delta']['tool_calls'] = tool_calls
+
+    if not content and not reasoning_content and not tool_calls:
+        template['choices'][0]['finish_reason'] = 'stop'
+
+    if usage:
+        template['usage'] = usage
+    return template
+
+
+def openai_chat_completion_message_template(
+    model: str,
+    message: Optional[str] = None,
+    reasoning_content: Optional[str] = None,
+    tool_calls: Optional[list[dict]] = None,
+    usage: Optional[dict] = None,
+) -> dict:
+    """
+    创建 OpenAI 聊天完成消息模板
+
+    参数:
+        model: 模型名称
+        message: 助手消息内容
+        reasoning_content: 推理内容
+        tool_calls: 工具调用
+        usage: 使用统计
+
+    返回:
+        OpenAI 聊天完成模板
+    """
+    template = openai_chat_message_template(model)
+    template['object'] = 'chat.completion'
+    if message is not None:
+        template['choices'][0]['message'] = {
+            'role': 'assistant',
+            'content': message,
+            **({'reasoning_content': reasoning_content} if reasoning_content else {}),
+            **({'tool_calls': tool_calls} if tool_calls else {}),
+        }
+
+    template['choices'][0]['finish_reason'] = 'tool_calls' if tool_calls else 'stop'
+
+    if usage:
+        template['usage'] = usage
+    return template
+
+
+def get_gravatar_url(email):
+    """
+    获取 Gravatar 头像 URL
+
+    参数:
+        email: 邮箱地址
+
+    返回:
+        Gravatar 头像 URL
+    """
+    # Trim leading and trailing whitespace from
+    # an email address and force all characters
+    # to lower case
+    address = str(email).strip().lower()
+
+    # Create a SHA256 hash of the final string
+    hash_object = hashlib.sha256(address.encode())
+    hash_hex = hash_object.hexdigest()
+
+    # Grab the actual image URL
+    return f'https://www.gravatar.com/avatar/{hash_hex}?d=mp'
 
 
 def deep_update(d, u):

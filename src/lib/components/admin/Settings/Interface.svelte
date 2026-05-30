@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - Interface
+  文件路径: src/lib/components/admin/Settings/Interface.svelte
+-->
+
+
 	import { getModels, getTaskConfig, updateTaskConfig } from '$lib/apis';
 	import { config, settings } from '$lib/stores';
 	import { createEventDispatcher, onMount, getContext } from 'svelte';

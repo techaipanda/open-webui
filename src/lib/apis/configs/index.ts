@@ -1,6 +1,20 @@
 import { WEBUI_API_BASE_URL, WEBUI_BASE_URL } from '$lib/constants';
 import type { Banner } from '$lib/types';
 
+/**
+ * API 客户端模块 - 配置管理 API
+ *
+ * 功能说明:
+ * - 系统配置获取与更新
+ * - 模型过滤配置
+ * - Webhook 配置
+ *
+ * 主要API端点:
+ * - /config - 系统配置
+ * - /config/model/filter - 模型过滤
+ * - /webhook - Webhook 配置
+ */
+
 export const importConfig = async (token: string, config) => {
 	let error = null;
 

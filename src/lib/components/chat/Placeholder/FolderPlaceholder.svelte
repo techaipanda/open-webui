@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - FolderPlaceholder
+  文件路径: src/lib/components/chat/Placeholder/FolderPlaceholder.svelte
+-->
+
+
 	import { getContext, onMount } from 'svelte';
 	import type { Writable } from 'svelte/store';
 

@@ -1,3 +1,11 @@
+"""
+数据模型: OAuth 会话模块
+数据库表: oauth_session
+功能: 管理 OAuth 认证会话，存储加密的访问令牌和刷新令牌
+关系: 与 User (多对一)
+说明: OAuth 令牌使用 Fernet 加密存储，支持多提供商（provider）会话管理
+"""
+
 import time
 import logging
 import uuid
@@ -24,6 +32,25 @@ log = logging.getLogger(__name__)
 
 
 class OAuthSession(Base):
+    """
+    OAuth 会话数据模型（SQLAlchemy ORM）
+
+    表名: oauth_session
+
+    字段说明:
+        id: UUID 主键，唯一标识会话
+        user_id: 用户 ID
+        provider: OAuth 提供商（如 google、github）
+        token: 加密存储的令牌 JSON
+        expires_at: 过期时间（秒时间戳）
+        created_at: 创建时间
+        updated_at: 更新时间
+
+    索引:
+        idx_oauth_session_user_id (user_id)
+        idx_oauth_session_expires_at (expires_at)
+        idx_oauth_session_user_provider (user_id, provider)
+    """
     __tablename__ = 'oauth_session'
 
     id = Column(Text, primary_key=True, unique=True)

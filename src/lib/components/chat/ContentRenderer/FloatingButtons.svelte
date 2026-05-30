@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - FloatingButtons
+  文件路径: src/lib/components/chat/ContentRenderer/FloatingButtons.svelte
+-->
+
+
 	import { getContext, tick } from 'svelte';
 	const i18n = getContext('i18n');
 

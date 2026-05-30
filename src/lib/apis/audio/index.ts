@@ -1,5 +1,9 @@
 import { AUDIO_API_BASE_URL } from '$lib/constants';
 
+/**
+ * API 客户端模块 - API 模块
+ */
+
 export const getAudioConfig = async (token: string) => {
 	let error = null;
 

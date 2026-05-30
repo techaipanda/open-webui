@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - ShortcutsModal
+  文件路径: src/lib/components/chat/ShortcutsModal.svelte
+-->
+
+
 	import { getContext, onMount } from 'svelte';
 	import Modal from '../common/Modal.svelte';
 	import { shortcuts } from '$lib/shortcuts';

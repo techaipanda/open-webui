@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 布局组件
+  功能描述: 布局组件 - UpdateInfoToast
+  文件路径: src/lib/components/layout/UpdateInfoToast.svelte
+-->
+
+
 	import { getContext, createEventDispatcher } from 'svelte';
 
 	const dispatch = createEventDispatcher();

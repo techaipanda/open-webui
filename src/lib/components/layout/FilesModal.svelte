@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 布局组件
+  功能描述: 布局组件 - FilesModal
+  文件路径: src/lib/components/layout/FilesModal.svelte
+-->
+
+
 	import { toast } from 'svelte-sonner';
 	import { getContext, onMount, onDestroy } from 'svelte';
 	import type { Writable } from 'svelte/store';

@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - Sidebar
+  文件路径: src/lib/components/common/Sidebar.svelte
+-->
+
+
 	import { fade, slide } from 'svelte/transition';
 
 	export let show = false;

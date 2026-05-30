@@ -1,3 +1,9 @@
+"""
+路由器: 技能模块
+API 前缀: /api/v1/skills
+功能: AI 技能/工具的管理,支持创建、搜索、更新、访问控制和启用/禁用切换
+"""
+
 import logging
 from typing import Optional
 

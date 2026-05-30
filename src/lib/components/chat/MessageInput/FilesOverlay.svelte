@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - FilesOverlay
+  文件路径: src/lib/components/chat/MessageInput/FilesOverlay.svelte
+-->
+
+
 	import AddFilesPlaceholder from '$lib/components/AddFilesPlaceholder.svelte';
 
 	export let show = false;

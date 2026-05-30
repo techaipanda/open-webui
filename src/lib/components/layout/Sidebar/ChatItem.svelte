@@ -1,4 +1,11 @@
 <script context="module" lang="ts">
+<!--
+  组件分类: 布局组件
+  功能描述: 布局组件 - ChatItem
+  文件路径: src/lib/components/layout/Sidebar/ChatItem.svelte
+-->
+
+
 	/** Shared 1×1 transparent drag preview; avoids one Image per sidebar row */
 	const invisibleDragImage = new Image();
 	invisibleDragImage.src =

@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 自动化组件
+  功能描述: 自动化组件 - AutomationEditor
+  文件路径: src/lib/components/automations/AutomationEditor.svelte
+-->
+
+
 	import { onMount, getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';

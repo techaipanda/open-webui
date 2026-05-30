@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - OllamaConnection
+  文件路径: src/lib/components/admin/Settings/Connections/OllamaConnection.svelte
+-->
+
+
 	import { getContext, tick } from 'svelte';
 	const i18n = getContext('i18n');
 

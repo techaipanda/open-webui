@@ -1,4 +1,11 @@
 <script lang="ts" context="module">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - KatexRenderer
+  文件路径: src/lib/components/chat/Messages/Markdown/KatexRenderer.svelte
+-->
+
+
 	import type { renderToString as katexRenderToString } from 'katex';
 
 	// Module-level singleton: load katex once, share across all KatexRenderer instances

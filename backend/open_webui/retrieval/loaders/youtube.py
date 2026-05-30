@@ -1,5 +1,19 @@
+"""
+YouTube 字幕加载器模块
+功能: 从 YouTube 视频中提取字幕/转录文本
+支持来源: youtube.com, youtu.be 及相关域名
+
+核心概念:
+- 字幕转录: 将视频的语音内容转换为文本
+- 多语言支持: 优先使用指定语言，无则回退到英语
+- 自动生成字幕 vs 手动字幕: 优先使用手动字幕
+
+依赖:
+- youtube_transcript_api: YouTube 字幕获取库
+"""
+
 import logging
-from xml.etree.ElementTree import ParseError
+from xml.etElementTree import ParseError
 
 from typing import Any, Dict, Generator, List, Optional, Sequence, Union
 from urllib.parse import parse_qs, urlparse
@@ -7,7 +21,10 @@ from langchain_core.documents import Document
 
 log = logging.getLogger(__name__)
 
+# 允许的 URL scheme（协议）
 ALLOWED_SCHEMES = {'http', 'https'}
+
+# 允许的 YouTube 相关域名（防止 SSRF 攻击）
 ALLOWED_NETLOCS = {
     'youtu.be',
     'm.youtube.com',
@@ -19,7 +36,20 @@ ALLOWED_NETLOCS = {
 
 
 def _parse_video_id(url: str) -> Optional[str]:
-    """Parse a YouTube URL and return the video ID if valid, otherwise None."""
+    """
+    解析 YouTube URL 并提取视频 ID
+
+    Args:
+        url: YouTube 视频 URL
+
+    Returns:
+        11位视频ID字符串，解析失败返回 None
+
+    支持格式:
+        - https://www.youtube.com/watch?v=VIDEO_ID
+        - https://youtu.be/VIDEO_ID
+        - https://www.youtube.com/v/VIDEO_ID
+    """
     parsed_url = urlparse(url)
 
     if parsed_url.scheme not in ALLOWED_SCHEMES:
@@ -49,7 +79,25 @@ def _parse_video_id(url: str) -> Optional[str]:
 
 
 class YoutubeLoader:
-    """Load `YouTube` video transcripts."""
+    """
+    YouTube 视频字幕加载器
+
+    功能:
+        从 YouTube 视频中提取字幕/转录文本内容
+
+    特点:
+        - 支持多种语言，优先使用用户指定的语言
+        - 优先使用手动字幕，自动字幕作为备选
+        - 支持通过代理服务器访问
+
+    方法:
+        load(): 同步加载字幕
+        aload(): 异步加载字幕
+
+    示例:
+        >>> loader = YoutubeLoader("https://youtube.com/watch?v=abc123")
+        >>> docs = loader.load()
+    """
 
     def __init__(
         self,
@@ -57,7 +105,14 @@ class YoutubeLoader:
         language: Union[str, Sequence[str]] = 'en',
         proxy_url: Optional[str] = None,
     ):
-        """Initialize with YouTube video ID."""
+        """
+        初始化 YouTube 加载器
+
+        Args:
+            video_id: YouTube 视频 ID 或完整 URL
+            language: 首选语言代码，支持多语言列表
+            proxy_url: 可选的代理服务器 URL
+        """
         _video_id = _parse_video_id(video_id)
         self.video_id = _video_id if _video_id is not None else video_id
         self._metadata = {'source': video_id}
@@ -74,7 +129,15 @@ class YoutubeLoader:
             self.language.append('en')
 
     def load(self) -> List[Document]:
-        """Load YouTube transcripts into `Document` objects."""
+        """
+        加载 YouTube 字幕并转换为 Document 对象
+
+        尝试按优先级加载指定语言的字幕，
+        如果失败则尝试手动字幕，最后回退到自动字幕
+
+        Returns:
+            Document 对象列表，包含字幕文本和元数据
+        """
         try:
             from youtube_transcript_api import (
                 NoTranscriptFound,
@@ -149,7 +212,11 @@ class YoutubeLoader:
         raise NoTranscriptFound(self.video_id, self.language, list(transcript_list))
 
     async def aload(self) -> Generator[Document, None, None]:
-        """Asynchronously load YouTube transcripts into `Document` objects."""
+        """
+        异步加载 YouTube 字幕
+
+        在线程池中执行同步的 load() 方法
+        """
         import asyncio
 
         loop = asyncio.get_event_loop()

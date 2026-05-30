@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 添加工具服务器模态框
+  文件路径: src/lib/components/AddToolServerModal.svelte
+-->
+
+
 	import { v4 as uuidv4 } from 'uuid';
 
 	import fileSaver from 'file-saver';

@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 布局组件
+  功能描述: 布局组件 - UserMenu
+  文件路径: src/lib/components/layout/Sidebar/UserMenu.svelte
+-->
+
+
 	import { createEventDispatcher, getContext, onMount, tick } from 'svelte';
 
 	import { goto } from '$app/navigation';

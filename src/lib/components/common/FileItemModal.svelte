@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - FileItemModal
+  文件路径: src/lib/components/common/FileItemModal.svelte
+-->
+
+
 	import type { WorkBook } from 'xlsx';
 	import DOMPurify from 'dompurify';
 

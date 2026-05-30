@@ -1,3 +1,11 @@
+"""
+数据模型: 用户组模块
+数据库表: group, group_member
+功能: 管理用户组和组成员关系，支持组级别的权限配置
+关系: 与 User (多对多, 通过 group_member), 与 GroupMember (一对多)
+说明: 用户可以属于多个组，组用于共享资源和管理权限，permissions 字段定义组级权限
+"""
+
 import json
 import logging
 import time
@@ -31,6 +39,22 @@ log = logging.getLogger(__name__)
 
 
 class Group(Base):
+    """
+    用户组数据模型（SQLAlchemy ORM）
+
+    表名: group
+
+    字段说明:
+        id: UUID 主键，唯一标识组
+        user_id: 创建者用户 ID
+        name: 组名称
+        description: 组描述
+        data: 配置数据（如 share 分享权限设置）
+        meta: 元数据
+        permissions: 权限配置
+        created_at: 创建时间
+        updated_at: 更新时间
+    """
     __tablename__ = 'group'
 
     id = Column(Text, unique=True, primary_key=True)
@@ -67,6 +91,18 @@ class GroupModel(BaseModel):
 
 
 class GroupMember(Base):
+    """
+    组成员关系数据模型（SQLAlchemy ORM）
+
+    表名: group_member
+
+    字段说明:
+        id: UUID 主键，唯一标识成员关系
+        group_id: 组 ID（外键，级联删除）
+        user_id: 用户 ID
+        created_at: 加入时间
+        updated_at: 更新时间
+    """
     __tablename__ = 'group_member'
 
     id = Column(Text, unique=True, primary_key=True)

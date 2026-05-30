@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - Embeds
+  文件路径: src/lib/components/chat/ChatControls/Embeds.svelte
+-->
+
+
 	import { embed, showControls, showEmbeds } from '$lib/stores';
 
 	import FullHeightIframe from '$lib/components/common/FullHeightIframe.svelte';

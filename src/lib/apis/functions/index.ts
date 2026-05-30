@@ -1,5 +1,17 @@
 import { WEBUI_API_BASE_URL } from '$lib/constants';
 
+/**
+ * API 客户端模块 - 函数 API
+ *
+ * 功能说明:
+ * - 函数注册与管理
+ * - 函数执行
+ * - 内置函数与自定义函数
+ *
+ * 主要API端点:
+ * - /functions/* - 函数操作
+ */
+
 export const createNewFunction = async (token: string, func: object) => {
 	let error = null;
 

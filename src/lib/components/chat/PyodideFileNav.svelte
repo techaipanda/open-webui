@@ -1,4 +1,11 @@
 <script context="module">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - PyodideFileNav
+  文件路径: src/lib/components/chat/PyodideFileNav.svelte
+-->
+
+
 	let savedPyodidePath = '/mnt/uploads';
 </script>
 

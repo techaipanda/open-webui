@@ -1,3 +1,19 @@
+"""
+工具模块: 聊天工具 (Chat Utilities)
+
+功能:
+- 聊天补全生成（generate_chat_completion）
+- 直接连接模式的聊天生成（generate_direct_chat_completion）
+- 聊天完成后处理（chat_completed）
+
+依赖:
+- fastapi, starlette
+- open_webui.socket.main
+- open_webui.routers.openai
+- open_webui.routers.ollama
+- open_webui.models
+"""
+
 import time
 import logging
 import sys
@@ -56,21 +72,32 @@ logging.basicConfig(stream=sys.stdout, level=GLOBAL_LOG_LEVEL)
 log = logging.getLogger(__name__)
 
 
-# When the question has been asked, let silence not be the
-# answer. But if the answer must wait, let it come honest.
+# 当问题已被问起时，让沉默不是答案。
+# 但如果答案必须等待，让它诚实到来。
 async def generate_direct_chat_completion(
     request: Request,
     form_data: dict,
     user: Any,
     models: dict,
 ):
+    """
+    生成直接连接的聊天补全
+
+    用于 WebSocket 直接连接场景，通过事件调用机制与客户端通信。
+
+    参数:
+        request: FastAPI 请求对象
+        form_data: 聊天请求表单数据
+        user: 当前认证用户
+        models: 可用模型字典
+    """
     log.info('generate_direct_chat_completion')
 
     metadata = form_data.pop('metadata', {})
 
     user_id = metadata.get('user_id')
     session_id = metadata.get('session_id')
-    request_id = str(uuid.uuid4())  # Generate a unique request ID
+    request_id = str(uuid.uuid4())  # 生成唯一请求 ID
 
     event_caller = await get_event_call(metadata)
     if event_caller is None:
@@ -79,6 +106,7 @@ async def generate_direct_chat_completion(
             'cannot generate completion in this context (e.g. background task).'
         )
 
+    # 构建 WebSocket 频道标识
     channel = f'{user_id}:{session_id}:{request_id}'
     logging.info(f'WebSocket channel: {channel}')
 
@@ -87,14 +115,14 @@ async def generate_direct_chat_completion(
 
         async def message_listener(sid, data):
             """
-            Handle received socket messages and push them into the queue.
+            处理接收到的 socket 消息并推入队列
             """
             await q.put(data)
 
-        # Register the listener
+        # 注册监听器
         sio.on(channel, message_listener)
 
-        # Start processing chat completion in background
+        # 在后台启动聊天补全处理
         res = await event_caller(
             {
                 'type': 'request:chat:completion',
@@ -110,15 +138,15 @@ async def generate_direct_chat_completion(
         log.info(f'res: {res}')
 
         if res.get('status', False):
-            # Define a generator to stream responses
+            # 定义流式响应生成器
             async def event_generator():
                 nonlocal q
                 try:
                     while True:
-                        data = await q.get()  # Wait for new messages
+                        data = await q.get()  # 等待新消息
                         if isinstance(data, dict):
                             if 'done' in data and data['done']:
-                                break  # Stop streaming when 'done' is received
+                                break  # 收到 'done' 时停止流式传输
 
                             yield f'data: {json.dumps(data)}\n\n'
                         elif isinstance(data, str):
@@ -130,14 +158,14 @@ async def generate_direct_chat_completion(
                     log.debug(f'Error in event generator: {e}')
                     pass
 
-            # Define a background task to run the event generator
+            # 定义后台任务运行事件生成器
             async def background():
                 try:
                     del sio.handlers['/'][channel]
                 except Exception as e:
                     pass
 
-            # Return the streaming response
+            # 返回流式响应
             return StreamingResponse(event_generator(), media_type='text/event-stream', background=background)
         else:
             raise Exception(str(res))
@@ -167,14 +195,31 @@ async def generate_chat_completion(
     bypass_filter: bool = False,
     bypass_system_prompt: bool = False,
 ):
+    """
+    生成聊天补全
+
+    核心聊天补全生成函数，处理来自前端或 API 的聊天请求。
+    支持多种模型类型（OpenAI、Ollama、Function、Pipe、Arena）。
+
+    参数:
+        request: FastAPI 请求对象
+        form_data: 聊天请求表单数据，包含 messages、model 等
+        user: 当前认证用户
+        bypass_filter: 是否跳过模型访问过滤（默认 False）
+        bypass_system_prompt: 是否跳过系统提示处理（默认 False）
+
+    返回:
+        dict 或 StreamingResponse: 聊天补全响应
+    """
     log.debug(f'generate_chat_completion: {form_data}')
     if BYPASS_MODEL_ACCESS_CONTROL:
         bypass_filter = True
 
-    # Propagate bypass_filter via request.state so that downstream route
-    # handlers (openai/ollama) can read it without exposing it as a query param.
+    # 通过 request.state 传播 bypass_filter，以便下游路由处理器可以读取
+    # 而无需将其作为查询参数暴露
     request.state.bypass_filter = bypass_filter
 
+    # 合并 metadata
     if hasattr(request.state, 'metadata'):
         if 'metadata' not in form_data:
             form_data['metadata'] = request.state.metadata
@@ -184,10 +229,8 @@ async def generate_chat_completion(
                 **request.state.metadata,
             }
 
+    # 直接连接模式：合并模型到服务器模型以便任务函数可以解析
     if getattr(request.state, 'direct', False) and hasattr(request.state, 'model'):
-        # Merge the direct connection model into server models so that
-        # task functions (title, tags, etc.) can resolve a server-side
-        # task model while still having the direct model available.
         models = {
             **request.app.state.MODELS,
             request.state.model['id']: request.state.model,
@@ -202,28 +245,27 @@ async def generate_chat_completion(
 
     model = models[model_id]
 
+    # 直接连接模式使用专用生成函数
     if getattr(request.state, 'direct', False) and model_id == getattr(request.state, 'model', {}).get('id'):
         return await generate_direct_chat_completion(request, form_data, user=user, models=models)
     else:
-        # Check if user has access to the model
+        # 检查用户是否有权访问该模型
         if not bypass_filter and user.role == 'user':
             try:
                 await check_model_access(user, model)
             except Exception as e:
                 raise e
 
-        # Arena model — sub-model was already resolved by process_chat_payload.
-        # Inject selected_model_id into the response for the frontend.
+        # Arena 模型 - 子模型已在 process_chat_payload 中解析
+        # 将 selected_model_id 注入响应以便前端使用
         metadata = form_data.get('metadata', {})
         selected_model_id = metadata.pop('selected_model_id', None)
-        # Also clear from request.state.metadata to prevent the merge at
-        # lines 177-179 from re-adding it on the recursive call.
+        # 也从 request.state.metadata 中清除以防止在递归调用时重新添加
         if hasattr(request.state, 'metadata'):
             request.state.metadata.pop('selected_model_id', None)
 
-        # Fallback: if generate_chat_completion is called with an arena model
-        # from a path that did NOT go through process_chat_payload (e.g.,
-        # background tasks for title/follow-up/tags generation), resolve now.
+        # 回退：如果 generate_chat_completion 是从没有经过 process_chat_payload
+        # 的路径调用的（例如用于标题/跟进/标签生成的后台任务），现在解析
         if not selected_model_id and model.get('owned_by') == 'arena':
             model_ids = model.get('info', {}).get('meta', {}).get('model_ids')
             filter_mode = model.get('info', {}).get('meta', {}).get('filter_mode')
@@ -280,11 +322,11 @@ async def generate_chat_completion(
                     'selected_model_id': selected_model_id,
                 }
 
+        # Pipe 模型：使用函数调用生成
         if model.get('pipe'):
-            # Below does not require bypass_filter because this is the only route the uses this function and it is already bypassing the filter
             return await generate_function_chat_completion(request, form_data, user=user, models=models)
+        # Ollama 模型：使用 /ollama/api/chat 端点
         if model.get('owned_by') == 'ollama':
-            # Using /ollama/api/chat endpoint
             form_data = convert_payload_openai_to_ollama(form_data)
             response = await generate_ollama_chat_completion(
                 request=request,
@@ -301,6 +343,7 @@ async def generate_chat_completion(
                 )
             else:
                 return convert_response_ollama_to_openai(response)
+        # 默认：使用 OpenAI 兼容端点
         else:
             return await generate_openai_chat_completion(
                 request=request,
@@ -310,10 +353,24 @@ async def generate_chat_completion(
             )
 
 
+# 聊天补全的别名
 chat_completion = generate_chat_completion
 
 
 async def chat_completed(request: Request, form_data: dict, user: Any):
+    """
+    处理聊天完成后的事件
+
+    在聊天完成后调用管道出口过滤器并更新消息状态。
+
+    参数:
+        request: FastAPI 请求对象
+        form_data: 聊天完成后的表单数据
+        user: 当前认证用户
+
+    返回:
+        dict: 处理后的结果
+    """
     if not request.app.state.MODELS:
         await get_all_models(request, user=user)
 
@@ -346,6 +403,7 @@ async def chat_completed(request: Request, form_data: dict, user: Any):
     if not data.get('id'):
         raise Exception('Missing message id')
 
+    # 构建元数据用于事件发射器
     metadata = {
         'chat_id': data['chat_id'],
         'message_id': data['id'],

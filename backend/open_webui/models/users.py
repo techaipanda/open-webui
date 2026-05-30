@@ -1,3 +1,11 @@
+"""
+数据模型: 用户模块
+数据库表: user, api_key
+功能: 管理用户账户信息、设置、个人资料和 API 密钥认证
+关系: 与 ApiKey (一对多), 与 Chat (一对多), 与 File (一对多), 与 Knowledge (一对多)
+说明: 用户角色（role）包括 admin、pending、user，支持 OAuth、SCIM 和 Webhook 通知
+"""
+
 import time
 from typing import Optional
 
@@ -39,6 +47,35 @@ class UserSettings(BaseModel):
 
 
 class User(Base):
+    """
+    用户账户数据模型（SQLAlchemy ORM）
+
+    表名: user
+
+    字段说明:
+        id: UUID 主键，唯一标识用户
+        email: 邮箱地址
+        username: 用户名（可选，50 字符限制）
+        role: 角色（admin/pending/user）
+        name: 显示名称
+        profile_image_url: 头像 URL
+        profile_banner_image_url: 横幅图片 URL
+        bio: 个人简介
+        gender: 性别
+        date_of_birth: 出生日期
+        timezone: 时区
+        presence_state: 在线状态
+        status_emoji: 状态表情
+        status_message: 状态消息
+        status_expires_at: 状态过期时间
+        info: 附加信息
+        settings: 用户设置（UI 配置等）
+        oauth: OAuth 提供商信息
+        scim: SCIM 身份提供商信息
+        last_active_at: 最后活跃时间
+        updated_at: 更新时间
+        created_at: 创建时间
+    """
     __tablename__ = 'user'
 
     id = Column(String, primary_key=True, unique=True)
@@ -120,6 +157,21 @@ class UserStatusModel(UserModel):
 
 
 class ApiKey(Base):
+    """
+    API 密钥数据模型（SQLAlchemy ORM）
+
+    表名: api_key
+
+    字段说明:
+        id: 密钥 ID（格式 key_{user_id}）
+        user_id: 关联用户 ID
+        key: API 密钥（加密存储）
+        data: 密钥配置数据
+        expires_at: 过期时间（可选）
+        last_used_at: 最后使用时间
+        created_at: 创建时间
+        updated_at: 更新时间
+    """
     __tablename__ = 'api_key'
 
     id = Column(Text, primary_key=True, unique=True)

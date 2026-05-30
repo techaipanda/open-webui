@@ -1,3 +1,11 @@
+"""
+数据模型: 聊天消息模块
+数据库表: chat_message
+功能: 存储聊天消息的规范化数据，支持消息的使用量（token）统计和分析
+关系: 与 Chat (多对一, 外键 chat_id)
+说明: 消息以复合 ID（chat_id-message_id）存储，支持嵌套回复树结构，用于分析和统计
+"""
+
 import json
 import time
 import uuid
@@ -73,6 +81,35 @@ def _token_columns(dialect: str):
 
 
 class ChatMessage(Base):
+    """
+    聊天消息数据模型（SQLAlchemy ORM）
+
+    表名: chat_message
+
+    字段说明:
+        id: 复合主键（chat_id-message_id 格式）
+        chat_id: 所属聊天 ID（外键，级联删除）
+        user_id: 发送者用户 ID
+        role: 角色（user/assistant/system）
+        parent_id: 父消息 ID（构建消息树）
+        content: 消息内容（可为字符串或块列表）
+        output: AI 输出内容
+        model_id: 使用的模型 ID
+        files: 附件文件列表
+        sources: 来源列表（RAG 引用）
+        embeds: 嵌入列表
+        done: 是否完成生成
+        status_history: 状态历史记录
+        error: 错误信息
+        usage: 使用量统计（token 数等）
+        created_at: 创建时间（秒时间戳）
+        updated_at: 更新时间（秒）
+
+    索引:
+        chat_message_chat_parent_idx (chat_id, parent_id)
+        chat_message_model_created_idx (model_id, created_at)
+        chat_message_user_created_idx (user_id, created_at)
+    """
     __tablename__ = 'chat_message'
 
     # Identity

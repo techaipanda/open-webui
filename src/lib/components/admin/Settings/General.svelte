@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - General
+  文件路径: src/lib/components/admin/Settings/General.svelte
+-->
+
+
 	import DOMPurify from 'dompurify';
 	import { v4 as uuidv4 } from 'uuid';
 

@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - FeedbackModal
+  文件路径: src/lib/components/admin/Evaluations/FeedbackModal.svelte
+-->
+
+
 	import Modal from '$lib/components/common/Modal.svelte';
 	import { getContext } from 'svelte';
 	const i18n = getContext('i18n');

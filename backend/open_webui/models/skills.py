@@ -1,3 +1,11 @@
+"""
+数据模型: 技能模块
+数据库表: skill
+功能: 管理 AI 技能定义，包含提示词模板和执行规范
+关系: 与 User (多对一)
+说明: 技能是预定义的 AI 能力模板，带有描述和激活状态，支持访问控制
+"""
+
 import logging
 import time
 from typing import Optional
@@ -20,6 +28,22 @@ log = logging.getLogger(__name__)
 
 
 class Skill(Base):
+    """
+    AI 技能数据模型（SQLAlchemy ORM）
+
+    表名: skill
+
+    字段说明:
+        id: 技能唯一标识
+        user_id: 创建者用户 ID
+        name: 技能名称（唯一）
+        description: 技能描述
+        content: 技能内容
+        meta: 元数据（如 tags）
+        is_active: 是否激活
+        updated_at: 更新时间
+        created_at: 创建时间
+    """
     __tablename__ = 'skill'
 
     id = Column(String, primary_key=True, unique=True)

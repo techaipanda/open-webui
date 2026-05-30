@@ -1,3 +1,11 @@
+"""
+数据模型: AI 模型配置模块
+数据库表: model
+功能: 管理 AI 模型的配置信息，包括参数（params）和元数据（meta）
+关系: 与 User (多对一)
+说明: 支持基础模型（base_model_id）和派生模型配置，包含模型的能力描述和标签
+"""
+
 import json
 import logging
 import time
@@ -63,6 +71,22 @@ class ModelMeta(BaseModel):
 
 
 class Model(Base):
+    """
+    AI 模型配置数据模型（SQLAlchemy ORM）
+
+    表名: model
+
+    字段说明:
+        id: 模型 ID（API 调用标识）
+        user_id: 创建者用户 ID
+        base_model_id: 基础模型 ID（用于请求代理）
+        name: 显示名称
+        params: 模型参数（JSON）
+        meta: 模型元数据（description、capabilities、tags）
+        is_active: 是否激活
+        updated_at: 更新时间
+        created_at: 创建时间
+    """
     __tablename__ = 'model'
 
     id = Column(Text, primary_key=True, unique=True)

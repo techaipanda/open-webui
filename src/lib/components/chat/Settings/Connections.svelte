@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - Connections
+  文件路径: src/lib/components/chat/Settings/Connections.svelte
+-->
+
+
 	import { toast } from 'svelte-sonner';
 	import { createEventDispatcher, onMount, getContext, tick } from 'svelte';
 	import { getModels as _getModels } from '$lib/apis';

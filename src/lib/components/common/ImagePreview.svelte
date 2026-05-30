@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - ImagePreview
+  文件路径: src/lib/components/common/ImagePreview.svelte
+-->
+
+
 	import { onDestroy, getContext } from 'svelte';
 
 	import fileSaver from 'file-saver';

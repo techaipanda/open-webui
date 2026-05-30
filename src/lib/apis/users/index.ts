@@ -1,6 +1,21 @@
 import { WEBUI_API_BASE_URL } from '$lib/constants';
 import { getUserPosition } from '$lib/utils';
 
+/**
+ * API 客户端模块 - 用户管理 API
+ *
+ * 功能说明:
+ * - 用户列表获取与管理
+ * - 用户创建、更新、删除
+ * - 用户组管理
+ * - 用户权限配置
+ *
+ * 主要API端点:
+ * - /users/ - 用户列表
+ * - /users/{id} - 用户操作
+ * - /groups - 用户组管理
+ */
+
 export const getUserGroups = async (token: string) => {
 	let error = null;
 

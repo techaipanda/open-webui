@@ -1,3 +1,11 @@
+"""
+数据模型: 函数模块
+数据库表: function
+功能: 管理用户定义的过滤函数（filter）和动作函数（action）
+关系: 与 User (多对一)
+说明: 函数可在聊天管道中插入，支持全局（is_global）和活跃状态（is_active）控制，带有阀门（valves）配置
+"""
+
 import logging
 import time
 from typing import Optional
@@ -19,6 +27,26 @@ log = logging.getLogger(__name__)
 
 
 class Function(Base):
+    """
+    函数数据模型（SQLAlchemy ORM）
+
+    表名: function
+
+    字段说明:
+        id: 函数唯一标识
+        user_id: 创建者用户 ID
+        name: 函数名称
+        type: 函数类型（filter/action）
+        content: 函数内容
+        meta: 元数据（description、manifest）
+        valves: 阀门配置
+        is_active: 是否激活
+        is_global: 是否全局（所有用户可用）
+        updated_at: 更新时间
+        created_at: 创建时间
+
+    索引: is_global_idx (is_global)
+    """
     __tablename__ = 'function'
 
     id = Column(String, primary_key=True, unique=True)

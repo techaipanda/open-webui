@@ -1,4 +1,11 @@
 <script>
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - ContentRenderer
+  文件路径: src/lib/components/chat/Messages/ContentRenderer.svelte
+-->
+
+
 	import { onDestroy, onMount, tick, getContext } from 'svelte';
 	const i18n = getContext('i18n');
 

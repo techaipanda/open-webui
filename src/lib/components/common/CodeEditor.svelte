@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - CodeEditor
+  文件路径: src/lib/components/common/CodeEditor.svelte
+-->
+
+
 	import '$lib/utils/codemirror';
 
 	import { basicSetup, EditorView } from 'codemirror';

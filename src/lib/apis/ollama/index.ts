@@ -1,5 +1,17 @@
 import { OLLAMA_API_BASE_URL } from '$lib/constants';
 
+/**
+ * API 客户端模块 - Ollama API
+ *
+ * 功能说明:
+ * - Ollama 模型管理
+ * - Ollama 连接配置
+ * - 模型运行时操作
+ *
+ * 主要API端点:
+ * - /ollama/* - Ollama 相关操作
+ */
+
 export const verifyOllamaConnection = async (token: string = '', connection: dict = {}) => {
 	let error = null;
 

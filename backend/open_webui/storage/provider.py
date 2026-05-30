@@ -1,3 +1,18 @@
+"""
+存储模块: 存储提供者 (Storage Providers)
+
+功能:
+- 多种存储后端的支持（Local、S3、GCS、Azure Blob）
+- 统一的文件上传/下载/删除接口
+- 存储后端的抽象和实现
+
+依赖:
+- boto3 (S3)
+- google-cloud-storage (GCS)
+- azure-storage-blob (Azure)
+- python-dotenv (配置)
+"""
+
 import os
 import shutil
 import json
@@ -38,26 +53,53 @@ log = logging.getLogger(__name__)
 
 
 class StorageProvider(ABC):
+    """
+    存储提供者抽象基类
+
+    定义所有存储后端必须实现的接口方法。
+    """
+
     @abstractmethod
     def get_file(self, file_path: str) -> str:
+        """获取文件，返回本地文件路径"""
         pass
 
     @abstractmethod
     def upload_file(self, file: BinaryIO, filename: str, tags: Dict[str, str]) -> Tuple[bytes, str]:
+        """上传文件，返回文件内容和路径"""
         pass
 
     @abstractmethod
     def delete_all_files(self) -> None:
+        """删除所有文件"""
         pass
 
     @abstractmethod
     def delete_file(self, file_path: str) -> None:
+        """删除指定文件"""
         pass
 
 
 class LocalStorageProvider(StorageProvider):
+    """
+    本地存储提供者
+
+    将文件存储在本地文件系统的 UPLOAD_DIR 目录中。
+    """
+
     @staticmethod
     def upload_file(file: BinaryIO, filename: str, tags: Dict[str, str]) -> Tuple[bytes, str]:
+        """
+        上传文件到本地存储
+
+        参数:
+            file: 文件二进制流
+            filename: 文件名
+            tags: 文件标签（字典）
+
+        返回:
+            Tuple[bytes, str]: 文件内容和本地文件路径
+        """
         contents = file.read()
         if not contents:
             raise ValueError(ERROR_MESSAGES.EMPTY_CONTENT)
@@ -68,12 +110,25 @@ class LocalStorageProvider(StorageProvider):
 
     @staticmethod
     def get_file(file_path: str) -> str:
-        """Handles downloading of the file from local storage."""
+        """
+        获取本地文件
+
+        参数:
+            file_path: 文件路径
+
+        返回:
+            str: 本地文件路径
+        """
         return file_path
 
     @staticmethod
     def delete_file(file_path: str) -> None:
-        """Handles deletion of the file from local storage."""
+        """
+        删除本地文件
+
+        参数:
+            file_path: 文件路径
+        """
         filename = os.path.basename(file_path)
         file_path = os.path.join(UPLOAD_DIR, filename)
         if os.path.isfile(file_path):
@@ -83,15 +138,17 @@ class LocalStorageProvider(StorageProvider):
 
     @staticmethod
     def delete_all_files() -> None:
-        """Handles deletion of all files from local storage."""
+        """
+        删除本地存储目录中的所有文件
+        """
         if os.path.exists(UPLOAD_DIR):
             for filename in os.listdir(UPLOAD_DIR):
                 file_path = os.path.join(UPLOAD_DIR, filename)
                 try:
                     if os.path.isfile(file_path) or os.path.islink(file_path):
-                        os.unlink(file_path)  # Remove the file or link
+                        os.unlink(file_path)  # 删除文件或链接
                     elif os.path.isdir(file_path):
-                        shutil.rmtree(file_path)  # Remove the directory
+                        shutil.rmtree(file_path)  # 删除目录
                 except Exception as e:
                     log.exception(f'Failed to delete {file_path}. Reason: {e}')
         else:
@@ -99,7 +156,20 @@ class LocalStorageProvider(StorageProvider):
 
 
 class S3StorageProvider(StorageProvider):
+    """
+    Amazon S3 存储提供者
+
+    将文件上传到 S3 兼容的存储服务（支持 AWS S3、MinIO 等）。
+    """
+
     def __init__(self):
+        """
+        初始化 S3 客户端
+
+        支持两种认证方式：
+        1. 显式凭证（access key + secret key）
+        2. 默认凭证（支持 IAM roles for EC2, EKS 等）
+        """
         config = Config(
             s3={
                 'use_accelerate_endpoint': S3_USE_ACCELERATE_ENDPOINT,
@@ -110,7 +180,7 @@ class S3StorageProvider(StorageProvider):
             response_checksum_validation='when_required',
         )
 
-        # If access key and secret are provided, use them for authentication
+        # 如果提供了 access key 和 secret，使用它们进行认证
         if S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY:
             self.s3_client = boto3.client(
                 's3',
@@ -121,8 +191,8 @@ class S3StorageProvider(StorageProvider):
                 config=config,
             )
         else:
-            # If no explicit credentials are provided, fall back to default AWS credentials
-            # This supports workload identity (IAM roles for EC2, EKS, etc.)
+            # 如果没有提供显式凭证，回退到默认 AWS 凭证
+            # 这支持工作负载标识（EC2、EKS 等的 IAM 角色）
             self.s3_client = boto3.client(
                 's3',
                 region_name=S3_REGION_NAME,
@@ -135,11 +205,31 @@ class S3StorageProvider(StorageProvider):
 
     @staticmethod
     def sanitize_tag_value(s: str) -> str:
-        """Only include S3 allowed characters."""
+        """
+        清理标签值，只保留 S3 允许的字符
+
+        参数:
+            s: 原始标签值字符串
+
+        返回:
+            str: 清理后的标签值
+        """
         return re.sub(r'[^a-zA-Z0-9 äöüÄÖÜß\+\-=\._:/@]', '', s)
 
     def upload_file(self, file: BinaryIO, filename: str, tags: Dict[str, str]) -> Tuple[bytes, str]:
-        """Handles uploading of the file to S3 storage."""
+        """
+        上传文件到 S3 存储
+
+        先上传到本地，然后同步到 S3。
+
+        参数:
+            file: 文件二进制流
+            filename: 文件名
+            tags: 文件标签
+
+        返回:
+            Tuple[bytes, str]: 文件内容和 S3 对象路径
+        """
         contents, file_path = LocalStorageProvider.upload_file(file, filename, tags)
         s3_key = os.path.join(self.key_prefix, filename)
         try:
@@ -160,7 +250,15 @@ class S3StorageProvider(StorageProvider):
             raise RuntimeError(f'Error uploading file to S3: {e}')
 
     def get_file(self, file_path: str) -> str:
-        """Handles downloading of the file from S3 storage."""
+        """
+        从 S3 下载文件到本地
+
+        参数:
+            file_path: S3 对象路径（格式：s3://bucket/key）
+
+        返回:
+            str: 本地文件路径
+        """
         try:
             s3_key = self._extract_s3_key(file_path)
             local_file_path = self._get_local_file_path(s3_key)
@@ -170,23 +268,32 @@ class S3StorageProvider(StorageProvider):
             raise RuntimeError(f'Error downloading file from S3: {e}')
 
     def delete_file(self, file_path: str) -> None:
-        """Handles deletion of the file from S3 storage."""
+        """
+        从 S3 删除文件
+
+        参数:
+            file_path: S3 对象路径
+        """
         try:
             s3_key = self._extract_s3_key(file_path)
             self.s3_client.delete_object(Bucket=self.bucket_name, Key=s3_key)
         except ClientError as e:
             raise RuntimeError(f'Error deleting file from S3: {e}')
 
-        # Always delete from local storage
+        # 同时删除本地文件
         LocalStorageProvider.delete_file(file_path)
 
     def delete_all_files(self) -> None:
-        """Handles deletion of all files from S3 storage."""
+        """
+        删除 S3 存储桶中的所有文件
+
+        只删除通过 open-webui 上传的文件（前缀匹配 key_prefix）。
+        """
         try:
             response = self.s3_client.list_objects_v2(Bucket=self.bucket_name)
             if 'Contents' in response:
                 for content in response['Contents']:
-                    # Skip objects that were not uploaded from open-webui in the first place
+                    # 跳过不是从 open-webui 上传的对象
                     if not content['Key'].startswith(self.key_prefix):
                         continue
 
@@ -194,10 +301,10 @@ class S3StorageProvider(StorageProvider):
         except ClientError as e:
             raise RuntimeError(f'Error deleting all files from S3: {e}')
 
-        # Always delete from local storage
+        # 同时删除本地所有文件
         LocalStorageProvider.delete_all_files()
 
-    # The s3 key is the name assigned to an object. It excludes the bucket name, but includes the internal path and the file name.
+    # S3 key 是分配给对象的名称，不包括桶名，但包括内部路径和文件名
     def _extract_s3_key(self, full_file_path: str) -> str:
         return '/'.join(full_file_path.split('//')[1].split('/')[1:])
 
@@ -206,7 +313,21 @@ class S3StorageProvider(StorageProvider):
 
 
 class GCSStorageProvider(StorageProvider):
+    """
+    Google Cloud Storage (GCS) 存储提供者
+
+    将文件存储到 Google Cloud Storage。
+    支持服务账号凭证和默认凭证（适用于 GCE 环境）。
+    """
+
     def __init__(self):
+        """
+        初始化 GCS 客户端
+
+        凭证优先级：
+        1. GOOGLE_APPLICATION_CREDENTIALS_JSON 环境变量
+        2. 默认凭证（本地环境使用用户凭证，GCE 使用元数据服务）
+        """
         self.bucket_name = GCS_BUCKET_NAME
 
         if GOOGLE_APPLICATION_CREDENTIALS_JSON:
@@ -214,14 +335,24 @@ class GCSStorageProvider(StorageProvider):
                 info=json.loads(GOOGLE_APPLICATION_CREDENTIALS_JSON)
             )
         else:
-            # if no credentials json is provided, credentials will be picked up from the environment
-            # if running on local environment, credentials would be user credentials
-            # if running on a Compute Engine instance, credentials would be from Google Metadata server
+            # 如果没有提供凭证 json，则从环境拾取凭证
+            # 本地环境使用用户凭证
+            # GCE 实例使用 Google 元数据服务
             self.gcs_client = storage.Client()
         self.bucket = self.gcs_client.bucket(GCS_BUCKET_NAME)
 
     def upload_file(self, file: BinaryIO, filename: str, tags: Dict[str, str]) -> Tuple[bytes, str]:
-        """Handles uploading of the file to GCS storage."""
+        """
+        上传文件到 GCS 存储
+
+        参数:
+            file: 文件二进制流
+            filename: 文件名
+            tags: 文件标签
+
+        返回:
+            Tuple[bytes, str]: 文件内容和 GCS 对象路径
+        """
         contents, file_path = LocalStorageProvider.upload_file(file, filename, tags)
         try:
             blob = self.bucket.blob(filename)
@@ -231,7 +362,15 @@ class GCSStorageProvider(StorageProvider):
             raise RuntimeError(f'Error uploading file to GCS: {e}')
 
     def get_file(self, file_path: str) -> str:
-        """Handles downloading of the file from GCS storage."""
+        """
+        从 GCS 下载文件到本地
+
+        参数:
+            file_path: GCS 对象路径（格式：gs://bucket/filename）
+
+        返回:
+            str: 本地文件路径
+        """
         try:
             filename = file_path.removeprefix('gs://').split('/')[1]
             local_file_path = os.path.join(UPLOAD_DIR, filename)
@@ -243,7 +382,12 @@ class GCSStorageProvider(StorageProvider):
             raise RuntimeError(f'Error downloading file from GCS: {e}')
 
     def delete_file(self, file_path: str) -> None:
-        """Handles deletion of the file from GCS storage."""
+        """
+        从 GCS 删除文件
+
+        参数:
+            file_path: GCS 对象路径
+        """
         try:
             filename = file_path.removeprefix('gs://').split('/')[1]
             blob = self.bucket.get_blob(filename)
@@ -251,11 +395,13 @@ class GCSStorageProvider(StorageProvider):
         except NotFound as e:
             raise RuntimeError(f'Error deleting file from GCS: {e}')
 
-        # Always delete from local storage
+        # 同时删除本地文件
         LocalStorageProvider.delete_file(file_path)
 
     def delete_all_files(self) -> None:
-        """Handles deletion of all files from GCS storage."""
+        """
+        删除 GCS 存储桶中的所有文件
+        """
         try:
             blobs = self.bucket.list_blobs()
 
@@ -265,27 +411,50 @@ class GCSStorageProvider(StorageProvider):
         except NotFound as e:
             raise RuntimeError(f'Error deleting all files from GCS: {e}')
 
-        # Always delete from local storage
+        # 同时删除本地所有文件
         LocalStorageProvider.delete_all_files()
 
 
 class AzureStorageProvider(StorageProvider):
+    """
+    Azure Blob Storage 存储提供者
+
+    将文件存储到 Azure Blob Storage。
+    支持存储账号密钥和 Azure Managed Identity 认证。
+    """
+
     def __init__(self):
+        """
+        初始化 Azure Blob Service Client
+
+        认证方式：
+        1. 存储账号密钥
+        2. DefaultAzureCredential（支持 Managed Identity）
+        """
         self.endpoint = AZURE_STORAGE_ENDPOINT
         self.container_name = AZURE_STORAGE_CONTAINER_NAME
         storage_key = AZURE_STORAGE_KEY
 
         if storage_key:
-            # Configure using the Azure Storage Account Endpoint and Key
+            # 使用存储账号端点和密钥配置
             self.blob_service_client = BlobServiceClient(account_url=self.endpoint, credential=storage_key)
         else:
-            # Configure using the Azure Storage Account Endpoint and DefaultAzureCredential
-            # If the key is not configured, then the DefaultAzureCredential will be used to support Managed Identity authentication
+            # 使用 DefaultAzureCredential 支持 Managed Identity 认证
             self.blob_service_client = BlobServiceClient(account_url=self.endpoint, credential=DefaultAzureCredential())
         self.container_client = self.blob_service_client.get_container_client(self.container_name)
 
     def upload_file(self, file: BinaryIO, filename: str, tags: Dict[str, str]) -> Tuple[bytes, str]:
-        """Handles uploading of the file to Azure Blob Storage."""
+        """
+        上传文件到 Azure Blob Storage
+
+        参数:
+            file: 文件二进制流
+            filename: 文件名
+            tags: 文件标签
+
+        返回:
+            Tuple[bytes, str]: 文件内容和 Azure 对象路径
+        """
         contents, file_path = LocalStorageProvider.upload_file(file, filename, tags)
         try:
             blob_client = self.container_client.get_blob_client(filename)
@@ -295,7 +464,15 @@ class AzureStorageProvider(StorageProvider):
             raise RuntimeError(f'Error uploading file to Azure Blob Storage: {e}')
 
     def get_file(self, file_path: str) -> str:
-        """Handles downloading of the file from Azure Blob Storage."""
+        """
+        从 Azure 下载文件到本地
+
+        参数:
+            file_path: Azure 对象路径
+
+        返回:
+            str: 本地文件路径
+        """
         try:
             filename = file_path.split('/')[-1]
             local_file_path = os.path.join(UPLOAD_DIR, filename)
@@ -307,7 +484,12 @@ class AzureStorageProvider(StorageProvider):
             raise RuntimeError(f'Error downloading file from Azure Blob Storage: {e}')
 
     def delete_file(self, file_path: str) -> None:
-        """Handles deletion of the file from Azure Blob Storage."""
+        """
+        从 Azure 删除文件
+
+        参数:
+            file_path: Azure 对象路径
+        """
         try:
             filename = file_path.split('/')[-1]
             blob_client = self.container_client.get_blob_client(filename)
@@ -315,11 +497,13 @@ class AzureStorageProvider(StorageProvider):
         except ResourceNotFoundError as e:
             raise RuntimeError(f'Error deleting file from Azure Blob Storage: {e}')
 
-        # Always delete from local storage
+        # 同时删除本地文件
         LocalStorageProvider.delete_file(file_path)
 
     def delete_all_files(self) -> None:
-        """Handles deletion of all files from Azure Blob Storage."""
+        """
+        删除 Azure 容器中的所有文件
+        """
         try:
             blobs = self.container_client.list_blobs()
             for blob in blobs:
@@ -327,11 +511,23 @@ class AzureStorageProvider(StorageProvider):
         except Exception as e:
             raise RuntimeError(f'Error deleting all files from Azure Blob Storage: {e}')
 
-        # Always delete from local storage
+        # 同时删除本地所有文件
         LocalStorageProvider.delete_all_files()
 
 
 def get_storage_provider(storage_provider: str):
+    """
+    获取存储提供者实例
+
+    参数:
+        storage_provider: 存储后端类型 ('local', 's3', 'gcs', 'azure')
+
+    返回:
+        StorageProvider: 存储提供者实例
+
+    异常:
+        RuntimeError: 不支持的存储后端时抛出
+    """
     if storage_provider == 'local':
         Storage = LocalStorageProvider()
     elif storage_provider == 's3':
@@ -345,4 +541,5 @@ def get_storage_provider(storage_provider: str):
     return Storage
 
 
+# 默认存储实例
 Storage = get_storage_provider(STORAGE_PROVIDER)

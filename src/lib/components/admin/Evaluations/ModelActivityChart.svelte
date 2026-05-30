@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - ModelActivityChart
+  文件路径: src/lib/components/admin/Evaluations/ModelActivityChart.svelte
+-->
+
+
 	import { onMount, onDestroy } from 'svelte';
 	import { getContext } from 'svelte';
 	import Spinner from '$lib/components/common/Spinner.svelte';

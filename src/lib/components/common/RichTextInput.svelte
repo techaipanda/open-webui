@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - RichTextInput
+  文件路径: src/lib/components/common/RichTextInput.svelte
+-->
+
+
 	import { marked } from 'marked';
 	import DOMPurify from 'dompurify';
 	import equal from 'fast-deep-equal';

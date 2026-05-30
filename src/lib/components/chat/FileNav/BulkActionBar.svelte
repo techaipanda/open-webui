@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - BulkActionBar
+  文件路径: src/lib/components/chat/FileNav/BulkActionBar.svelte
+-->
+
+
 	import { getContext } from 'svelte';
 	import GarbageBin from '../../icons/GarbageBin.svelte';
 	import Tooltip from '../../common/Tooltip.svelte';

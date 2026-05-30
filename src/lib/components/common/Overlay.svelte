@@ -1,4 +1,11 @@
 <script>
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - Overlay
+  文件路径: src/lib/components/common/Overlay.svelte
+-->
+
+
 	import Spinner from './Spinner.svelte';
 
 	export let show = false;

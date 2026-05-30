@@ -1,5 +1,13 @@
 """Prompt history model for version tracking."""
 
+"""
+数据模型: 提示词历史模块
+数据库表: prompt_history
+功能: 存储提示词的版本快照，支持版本追踪和差异比较
+关系: 与 User (多对一), 与 Prompt (多对一)
+说明: 每次提示词修改创建新快照，支持恢复到历史版本和查看变更差异
+"""
+
 import time
 import uuid
 from typing import Optional
@@ -20,6 +28,20 @@ from sqlalchemy import BigInteger, Column, Text, JSON, Index
 
 
 class PromptHistory(Base):
+    """
+    提示词历史版本数据模型（SQLAlchemy ORM）
+
+    表名: prompt_history
+
+    字段说明:
+        id: UUID 主键，唯一标识版本记录
+        prompt_id: 关联的提示词 ID
+        parent_id: 父版本 ID（构建版本链）
+        snapshot: 版本快照（完整的提示词数据）
+        user_id: 创建者用户 ID
+        commit_message: 提交说明
+        created_at: 创建时间
+    """
     __tablename__ = 'prompt_history'
 
     id = Column(Text, primary_key=True)

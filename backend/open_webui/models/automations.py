@@ -1,3 +1,11 @@
+"""
+数据模型: 自动化任务模块
+数据库表: automation, automation_run
+功能: 管理定时自动化任务（如日历事件触发），支持 RRULE 规则定义
+关系: 与 User (多对一), 与 Chat (一对多, 可选)
+说明: 自动化任务按 RRULE 规则定时执行，创建 Chat 来记录执行结果
+"""
+
 import time
 import logging
 from typing import Optional
@@ -18,6 +26,25 @@ log = logging.getLogger(__name__)
 
 
 class Automation(Base):
+    """
+    自动化任务数据模型（SQLAlchemy ORM）
+
+    表名: automation
+
+    字段说明:
+        id: UUID 主键，唯一标识任务
+        user_id: 创建者用户 ID
+        name: 任务名称
+        data: JSON 配置（包含 prompt、model_id、rrule 和可选的 terminal 配置）
+        meta: 元数据（如提醒设置）
+        is_active: 是否激活
+        last_run_at: 上次执行时间（纳秒时间戳）
+        next_run_at: 下次执行时间（纳秒时间戳）
+        created_at: 创建时间（纳秒）
+        updated_at: 更新时间（纳秒）
+
+    索引: ix_automation_next_run (next_run_at)
+    """
     __tablename__ = 'automation'
 
     id = Column(Text, primary_key=True)
@@ -36,6 +63,23 @@ class Automation(Base):
 
 
 class AutomationRun(Base):
+    """
+    自动化任务执行记录数据模型（SQLAlchemy ORM）
+
+    表名: automation_run
+
+    字段说明:
+        id: UUID 主键，唯一标识执行记录
+        automation_id: 关联的自动化任务 ID
+        chat_id: 执行时创建的聊天 ID（可为 null）
+        status: 执行状态（success/error）
+        error: 错误信息（执行失败时）
+        created_at: 创建时间（纳秒）
+
+    索引:
+        ix_automation_run_automation_id
+        ix_automation_run_aid_created (automation_id, created_at)
+    """
     __tablename__ = 'automation_run'
 
     id = Column(Text, primary_key=True)

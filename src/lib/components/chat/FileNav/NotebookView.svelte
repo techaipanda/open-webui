@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - NotebookView
+  文件路径: src/lib/components/chat/FileNav/NotebookView.svelte
+-->
+
+
 	import { getContext, onMount, onDestroy } from 'svelte';
 	import { marked } from 'marked';
 	import DOMPurify from 'dompurify';

@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - ConsecutiveDetailsGroup
+  文件路径: src/lib/components/chat/Messages/Markdown/ConsecutiveDetailsGroup.svelte
+-->
+
+
 	import { decode } from 'html-entities';
 	import { getContext } from 'svelte';
 	import { slide } from 'svelte/transition';

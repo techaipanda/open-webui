@@ -1,3 +1,8 @@
+/**
+ * 类型定义模块
+ * 定义应用中使用的 TypeScript 类型
+ */
+
 export type Banner = {
 	id: string;
 	type: string;

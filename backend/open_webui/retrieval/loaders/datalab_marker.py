@@ -1,3 +1,22 @@
+"""
+DataLab Marker 文档解析加载器
+功能: 将 PDF、Office文档、图片等转换为 Markdown/JSON/HTML 格式
+支持类型: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, EPUB, HTML, PNG, JPG 等
+
+核心概念:
+- LLM 增强: 可选使用 LLM 提升解析质量
+- OCR 识别: 可选启用光学字符识别处理扫描文档
+- 分页处理: 支持将长文档分页处理
+
+依赖:
+- DataLab Marker API 服务
+
+配置环境变量:
+- DATALAB_MARKER_API_KEY: API 密钥
+- DATALAB_MARKER_API_BASE_URL: API 基础 URL
+- DATALAB_MARKER_OUTPUT_FORMAT: 输出格式 (markdown/json/html)
+"""
+
 import os
 import time
 import requests
@@ -11,6 +30,23 @@ log = logging.getLogger(__name__)
 
 
 class DatalabMarkerLoader:
+    """
+    DataLab Marker 文档加载器
+
+    功能:
+        调用 DataLab Marker API 将各种文档格式转换为 Markdown 等格式
+
+    特点:
+        - 支持多种文档格式
+        - 可选的 LLM 增强处理
+        - 支持 OCR 识别扫描文档
+        - 自动分页处理
+
+    方法:
+        load(): 调用 API 并返回解析后的文本内容
+        check_marker_request_status(): 查询异步任务状态
+    """
+
     def __init__(
         self,
         file_path: str,
@@ -26,6 +62,23 @@ class DatalabMarkerLoader:
         format_lines: bool = False,
         output_format: str = None,
     ):
+        """
+        初始化 DataLab Marker 加载器
+
+        Args:
+            file_path: 文件路径
+            api_key: DataLab Marker API 密钥
+            api_base_url: API 基础 URL
+            additional_config: 额外的 JSON 配置
+            use_llm: 是否使用 LLM 增强
+            skip_cache: 是否跳过缓存
+            force_ocr: 是否强制 OCR
+            paginate: 是否分页处理
+            strip_existing_ocr: 是否移除现有 OCR
+            disable_image_extraction: 是否禁用图片提取
+            format_lines: 是否格式化行
+            output_format: 输出格式 (markdown/json/html)
+        """
         self.file_path = file_path
         self.api_key = api_key
         self.api_base_url = api_base_url
@@ -40,6 +93,15 @@ class DatalabMarkerLoader:
         self.output_format = output_format
 
     def _get_mime_type(self, filename: str) -> str:
+        """
+        根据文件扩展名获取 MIME 类型
+
+        Args:
+            filename: 文件名
+
+        Returns:
+            MIME 类型字符串
+        """
         ext = filename.rsplit('.', 1)[-1].lower()
         mime_map = {
             'pdf': 'application/pdf',
@@ -64,6 +126,15 @@ class DatalabMarkerLoader:
         return mime_map.get(ext, 'application/octet-stream')
 
     def check_marker_request_status(self, request_id: str) -> dict:
+        """
+        查询 Marker API 异步任务状态
+
+        Args:
+            request_id: 任务ID
+
+        Returns:
+            状态信息字典
+        """
         url = f'{self.api_base_url}/{request_id}'
         headers = {'X-Api-Key': self.api_key}
         try:
@@ -83,6 +154,16 @@ class DatalabMarkerLoader:
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=f'Invalid JSON: {e}')
 
     def load(self) -> List[Document]:
+        """
+        加载并解析文档
+
+        支持两种模式:
+        1. 自托管模式: 直接返回结果
+        2. DataLab 云端模式: 轮询等待完成
+
+        Returns:
+            Document 对象列表
+        """
         filename = os.path.basename(self.file_path)
         mime_type = self._get_mime_type(filename)
         headers = {'X-Api-Key': self.api_key}

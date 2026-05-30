@@ -1,6 +1,21 @@
 import { WEBUI_API_BASE_URL } from '$lib/constants';
 import { splitStream } from '$lib/utils';
 
+/**
+ * API 客户端模块 - 文件管理 API
+ *
+ * 功能说明:
+ * - 文件上传与处理
+ * - 文件搜索与获取
+ * - 文件内容更新与删除
+ *
+ * 主要API端点:
+ * - /files/ - 文件列表与上传
+ * - /files/{id} - 文件详情操作
+ * - /files/search - 搜索文件
+ * - /files/{id}/content - 文件内容
+ */
+
 export const uploadFile = async (
 	token: string,
 	file: File,

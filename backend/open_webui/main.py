@@ -1,3 +1,16 @@
+"""
+模块名称: 主应用模块 (Main Application Module)
+功能: FastAPI应用入口，配置中间件、路由注册、应用生命周期管理
+依赖: asyncio, fastapi, sqlalchemy, redis, starsessions, uvicorn
+说明:
+  - 应用初始化和配置
+  - CORS、会话、压缩等中间件配置
+  - WebSocket支持
+  - API路由注册（auths, chats, models, users等）
+  - 数据库连接和Redis会话存储
+  - 审计日志和性能监控
+"""
+
 import asyncio
 import inspect
 import json
@@ -606,13 +619,19 @@ log = logging.getLogger(__name__)
 
 
 class SPAStaticFiles(StaticFiles):
+    """
+    单页应用（SPA）静态文件服务类
+    继承自 Starlette 的 StaticFiles，用于服务前端构建文件
+    重写了 get_response 以支持 SPA 的客户端路由
+    """
+
     async def get_response(self, path: str, scope):
         try:
             return await super().get_response(path, scope)
         except (HTTPException, StarletteHTTPException) as ex:
             if ex.status_code == 404:
+                # JavaScript 文件返回 404，其他文件返回 index.html（支持客户端路由）
                 if path.endswith('.js'):
-                    # Return 404 for javascript files
                     raise ex
                 else:
                     return await super().get_response('index.html', scope)
@@ -638,33 +657,57 @@ https://github.com/open-webui/open-webui
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Store reference to main event loop for sync->async calls (e.g., embedding generation)
-    # This allows sync functions to schedule work on the main loop without blocking health checks
+    """
+    应用生命周期管理
+    处理启动和关闭时的资源初始化与清理
+
+    启动时：
+    - 保存主事件循环引用（用于同步到异步的嵌入生成）
+    - 初始化日志系统
+    - 重置配置（如启用）
+    - 获取许可证数据（如提供）
+    - 创建管理员账户（如指定）
+    - 停用所有函数（如安全模式）
+    - 安装函数和工具的外部依赖
+    - 初始化Redis连接和任务命令监听器
+    - 设置线程池限制
+    - 启动定期清理任务
+    - 启动自动化调度器
+    - 预取模型列表和工具服务器规格
+
+    关闭时：
+    - 关闭数据库会话
+    - 取消Redis任务命令监听器
+    """
+    # 保存主事件循环引用，用于同步->异步调用（如嵌入生成）
     app.state.main_loop = asyncio.get_running_loop()
 
     app.state.instance_id = INSTANCE_ID
     start_logger()
 
+    # 重置配置（如启用）
     if RESET_CONFIG_ON_START:
         await async_reset_config()
 
+    # 获取许可证数据
     if LICENSE_KEY:
         get_license_data(app, LICENSE_KEY)
 
-    # Create admin account from env vars if specified and no users exist
+    # 如果指定了管理员凭据且没有现有用户，则创建管理员账户
     if WEBUI_ADMIN_EMAIL and WEBUI_ADMIN_PASSWORD:
         if await create_admin_user(WEBUI_ADMIN_EMAIL, WEBUI_ADMIN_PASSWORD, WEBUI_ADMIN_NAME):
-            # Disable signup since we now have an admin
+            # 已有管理员，禁用注册
             app.state.config.ENABLE_SIGNUP = False
 
+    # 安全模式下停用所有函数
     if SAFE_MODE:
         await Functions.deactivate_all_functions()
 
-    # This should be blocking (sync) so functions are not deactivated on first /get_models calls
-    # when the first user lands on the / route.
+    # 安装函数和工具的外部依赖（同步阻塞，不会因首次 /get_models 调用而停用函数）
     log.info('Installing external dependencies of functions and tools...')
     await install_tool_and_function_dependencies()
 
+    # 初始化 Redis 连接
     app.state.redis = get_redis_connection(
         redis_url=REDIS_URL,
         redis_sentinels=get_sentinels_from_env(REDIS_SENTINEL_HOSTS, REDIS_SENTINEL_PORT),
@@ -672,25 +715,29 @@ async def lifespan(app: FastAPI):
         async_mode=True,
     )
 
+    # 启动 Redis 任务命令监听器（用于分布式任务停止）
     if app.state.redis is not None:
         app.state.redis_task_command_listener = asyncio.create_task(redis_task_command_listener(app))
 
+    # 设置线程池限制（如配置）
     if THREAD_POOL_SIZE and THREAD_POOL_SIZE > 0:
         limiter = anyio.to_thread.current_default_thread_limiter()
         limiter.total_tokens = THREAD_POOL_SIZE
 
+    # 启动定期使用率和会话池清理任务
     asyncio.create_task(periodic_usage_pool_cleanup())
     asyncio.create_task(periodic_session_pool_cleanup())
 
+    # 启动自动化调度器工作循环
     from open_webui.utils.automations import scheduler_worker_loop
-
     asyncio.create_task(scheduler_worker_loop(app))
 
+    # 预取模型列表（如启用基础模型缓存）
     if app.state.config.ENABLE_BASE_MODELS_CACHE:
         try:
             await get_all_models(
                 Request(
-                    # Creating a mock request object to pass to get_all_models
+                    # 创建模拟请求对象传递给 get_all_models
                     {
                         'type': 'http',
                         'asgi.version': '3.0',
@@ -710,7 +757,7 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             log.warning(f'Failed to pre-fetch models at startup: {e}')
 
-    # Pre-fetch tool server specs so the first request doesn't pay the latency cost
+    # 预取工具服务器规格（避免首次请求的延迟成本）
     if len(app.state.config.TOOL_SERVER_CONNECTIONS) > 0:
         mock_request = Request(
             {
@@ -735,22 +782,23 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             log.warning(f'Failed to initialize tool servers at startup: {e}')
 
+        log.info('Initializing terminal servers...')
         try:
             await set_terminal_servers(mock_request)
             log.info(f'Initialized {len(app.state.TERMINAL_SERVERS)} terminal server(s)')
         except Exception as e:
             log.warning(f'Failed to initialize terminal servers at startup: {e}')
 
-    # Mark application as ready to accept traffic from a startup perspective.
+    # 标记应用已就绪，可接受流量
     app.state.startup_complete = True
 
     yield
 
-    # Shutdown: clean up shared resources
+    # 关闭：清理共享资源
     from open_webui.utils.session_pool import close_session
-
     await close_session()
 
+    # 取消 Redis 任务命令监听器
     if hasattr(app.state, 'redis_task_command_listener'):
         app.state.redis_task_command_listener.cancel()
 

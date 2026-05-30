@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - Evaluations
+  文件路径: src/lib/components/admin/Settings/Evaluations.svelte
+-->
+
+
 	import { toast } from 'svelte-sonner';
 	import { models, settings, user, config } from '$lib/stores';
 	import { createEventDispatcher, onMount, getContext, tick } from 'svelte';

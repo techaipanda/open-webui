@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - ShareChatModal
+  文件路径: src/lib/components/chat/ShareChatModal.svelte
+-->
+
+
 	import { getContext, onMount } from 'svelte';
 	import { models, config, user } from '$lib/stores';
 

@@ -1,4 +1,11 @@
 <script>
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - ArenaModelModal
+  文件路径: src/lib/components/admin/Settings/Evaluations/ArenaModelModal.svelte
+-->
+
+
 	import { createEventDispatcher, getContext, onMount } from 'svelte';
 	const i18n = getContext('i18n');
 	const dispatch = createEventDispatcher();

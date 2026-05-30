@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - QueuedMessageItem
+  文件路径: src/lib/components/chat/MessageInput/QueuedMessageItem.svelte
+-->
+
+
 	import { getContext } from 'svelte';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import Image from '$lib/components/common/Image.svelte';

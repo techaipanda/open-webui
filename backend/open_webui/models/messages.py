@@ -1,3 +1,11 @@
+"""
+数据模型: 频道消息模块
+数据库表: message, message_reaction
+功能: 管理频道内的聊天消息，支持回复、置顶和 Reactions 互动
+关系: 与 User (多对一), 与 Channel (多对一), 与 MessageReaction (一对多)
+说明: 消息支持线程回复（parent_id）、置顶（is_pinned）和表情反应（message_reaction）
+"""
+
 import json
 import time
 import uuid
@@ -22,6 +30,18 @@ from sqlalchemy.sql import exists
 
 
 class MessageReaction(Base):
+    """
+    消息反应数据模型（SQLAlchemy ORM）
+
+    表名: message_reaction
+
+    字段说明:
+        id: UUID 主键，唯一标识反应
+        user_id: 反应者用户 ID
+        message_id: 消息 ID
+        name: 反应名称（如 emoji）
+        created_at: 创建时间
+    """
     __tablename__ = 'message_reaction'
     id = Column(Text, primary_key=True, unique=True)
     user_id = Column(Text)
@@ -41,6 +61,26 @@ class MessageReactionModel(BaseModel):
 
 
 class Message(Base):
+    """
+    频道消息数据模型（SQLAlchemy ORM）
+
+    表名: message
+
+    字段说明:
+        id: UUID 主键，唯一标识消息
+        user_id: 发送者用户 ID
+        channel_id: 所属频道 ID
+        reply_to_id: 回复的消息 ID
+        parent_id: 父消息 ID（构建线程树）
+        is_pinned: 是否置顶
+        pinned_at: 置顶时间
+        pinned_by: 置顶操作者 ID
+        content: 消息内容
+        data: 附加数据
+        meta: 元数据
+        created_at: 创建时间（纳秒）
+        updated_at: 更新时间（纳秒）
+    """
     __tablename__ = 'message'
     id = Column(Text, primary_key=True, unique=True)
 

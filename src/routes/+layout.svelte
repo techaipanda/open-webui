@@ -1,4 +1,10 @@
 <script>
+<!--
+  页面组件: 布局组件 - 页面通用布局
+  文件路径: src/routes/+layout.svelte
+-->
+
+
 	import { io } from 'socket.io-client';
 	import { spring } from 'svelte/motion';
 	import PyodideWorker from '$lib/workers/pyodide.worker?worker';

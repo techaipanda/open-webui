@@ -1,3 +1,8 @@
+/**
+ * 工具函数模块 - 音频处理工具 - 音频格式转换和处理
+ */
+
+
 type AudioQueueEvent = 'stop' | 'empty-queue' | 'id-change';
 
 interface AudioQueueStopDetail {

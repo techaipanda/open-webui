@@ -1,4 +1,11 @@
 <script>
+<!--
+  组件分类: 布局组件
+  功能描述: 布局组件 - PinnedModelList
+  文件路径: src/lib/components/layout/Sidebar/PinnedModelList.svelte
+-->
+
+
 	import Sortable from 'sortablejs';
 
 	import { onDestroy, onMount, tick } from 'svelte';

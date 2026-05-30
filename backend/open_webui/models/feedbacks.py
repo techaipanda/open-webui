@@ -1,3 +1,11 @@
+"""
+数据模型: 用户反馈模块
+数据库表: feedback
+功能: 存储用户对 AI 模型的反馈评分（Arena 对战），支持排行榜和模型评估历史
+关系: 与 User (多对一)
+说明: 反馈数据包含评分（rating）、模型ID、对局快照和元数据，用于模型比较和排名
+"""
+
 import logging
 import time
 import uuid
@@ -20,6 +28,22 @@ log = logging.getLogger(__name__)
 
 
 class Feedback(Base):
+    """
+    用户反馈数据模型（SQLAlchemy ORM）
+
+    表名: feedback
+
+    字段说明:
+        id: UUID 主键，唯一标识反馈
+        user_id: 提交者用户 ID
+        version: 版本号
+        type: 反馈类型
+        data: 评分数据（rating、model_id、reason、comment 等）
+        meta: 元数据（arena、chat_id、message_id、tags）
+        snapshot: 对局快照（聊天历史）
+        created_at: 创建时间
+        updated_at: 更新时间
+    """
     __tablename__ = 'feedback'
     id = Column(Text, primary_key=True, unique=True)
     user_id = Column(Text)

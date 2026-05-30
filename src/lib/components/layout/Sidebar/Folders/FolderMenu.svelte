@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 布局组件
+  功能描述: 布局组件 - FolderMenu
+  文件路径: src/lib/components/layout/Sidebar/Folders/FolderMenu.svelte
+-->
+
+
 	import { getContext, createEventDispatcher } from 'svelte';
 
 	const i18n = getContext('i18n');

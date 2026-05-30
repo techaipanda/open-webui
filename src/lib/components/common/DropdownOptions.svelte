@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - DropdownOptions
+  文件路径: src/lib/components/common/DropdownOptions.svelte
+-->
+
+
 	import { getContext } from 'svelte';
 
 	import Select from '$lib/components/common/Select.svelte';

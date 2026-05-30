@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - Dropdown
+  文件路径: src/lib/components/common/Dropdown.svelte
+-->
+
+
 	import { flyAndScale } from '$lib/utils/transitions';
 	import { tick } from 'svelte';
 

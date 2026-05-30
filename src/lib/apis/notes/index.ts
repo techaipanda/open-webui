@@ -1,6 +1,10 @@
 import { WEBUI_API_BASE_URL } from '$lib/constants';
 import { getTimeRange } from '$lib/utils';
 
+/**
+ * API 客户端模块 - API 模块
+ */
+
 type NoteItem = {
 	title: string;
 	data: object;

@@ -1,3 +1,29 @@
+"""
+ColBERT 重排序模型模块
+功能: 使用 ColBERT 模型进行文档重排序
+
+概述:
+ColBERT（Contextualized Late Interaction over BERT）是一种高效的神经排序模型。
+它使用 BERT 对查询和文档分别编码，然后在延迟交互阶段计算相关性分数。
+
+核心原理:
+1. 编码阶段：分别对查询和文档进行编码，每个词产生一个向量
+2. 延迟交互：查询向量与文档向量进行最大相似度匹配（MaxSim）
+3. 聚合阶段：将所有匹配分数求和得到最终相关性分数
+
+特点:
+- 延迟交互：可以在编码阶段做预计算，提高推理效率
+- 深度语义理解：利用 BERT 的上下文理解能力
+- 支持 GPU 加速
+
+模型来源:
+- 默认使用 ColBERT 官方预训练模型
+- 支持从 HuggingFace 或本地加载自定义模型
+
+环境变量:
+- COLBERT_ENV: 设置为 'docker' 时启用 Docker 特殊处理
+"""
+
 import os
 import logging
 import torch
@@ -12,7 +38,22 @@ log = logging.getLogger(__name__)
 
 
 class ColBERT(BaseReranker):
+    """
+    ColBERT 重排序模型实现
+
+    Attributes:
+        device: 计算设备（cuda 或 cpu）
+        ckpt: ColBERT 检查点/模型
+    """
+
     def __init__(self, name, **kwargs) -> None:
+        """
+        初始化 ColBERT 模型
+
+        Args:
+            name: 模型名称或路径
+            **kwargs: 其他参数（env='docker' 时启用特殊处理）
+        """
         log.info('ColBERT: Loading model', name)
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -34,6 +75,21 @@ class ColBERT(BaseReranker):
         pass
 
     def calculate_similarity_scores(self, query_embeddings, document_embeddings):
+        """
+        计算查询与文档之间的相似度分数
+
+        使用 MaxSim 算法计算每个文档的分数：
+        1. 对查询和文档向量进行矩阵乘法
+        2. 对每行取最大值（最大相似度）
+        3. 对所有最大值求和
+
+        Args:
+            query_embeddings: 查询向量 (batch, query_len, dim)
+            document_embeddings: 文档向量 (batch, doc_len, dim)
+
+        Returns:
+            归一化的相似度分数数组
+        """
         query_embeddings = query_embeddings.to(self.device)
         document_embeddings = document_embeddings.to(self.device)
 
@@ -60,6 +116,16 @@ class ColBERT(BaseReranker):
         return normalized_scores.detach().cpu().numpy().astype(np.float32)
 
     def predict(self, sentences, batch_size=32):
+        """
+        预测查询-文档对的相关性分数
+
+        Args:
+            sentences: (查询, 文档) 元组列表
+            batch_size: 批处理大小
+
+        Returns:
+            浮点数分数列表
+        """
         query = sentences[0][0]
         docs = [i[1] for i in sentences]
 

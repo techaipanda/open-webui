@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - SVGPanZoom
+  文件路径: src/lib/components/common/SVGPanZoom.svelte
+-->
+
+
 	import fileSaver from 'file-saver';
 	const { saveAs } = fileSaver;
 

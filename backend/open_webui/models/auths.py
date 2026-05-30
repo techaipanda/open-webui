@@ -1,3 +1,11 @@
+"""
+数据模型: 认证模块
+数据库表: auth
+功能: 存储用户认证信息（邮箱、密码），与 users 表通过 id 关联
+关系: 与 User (一对一), 与 Chats (一对多)
+说明: 认证信息与用户基本信息分离管理，密码以哈希形式存储
+"""
+
 import logging
 import uuid
 from typing import Optional
@@ -18,6 +26,17 @@ log = logging.getLogger(__name__)
 
 
 class Auth(Base):
+    """
+    认证信息数据模型（SQLAlchemy ORM）
+
+    表名: auth
+
+    字段说明:
+        id: 用户 ID（与 users 表关联），主键
+        email: 邮箱地址，用于登录认证
+        password: 密码哈希值（bcrypt 加密，不存储明文）
+        active: 账户是否激活
+    """
     __tablename__ = 'auth'
 
     id = Column(String, primary_key=True, unique=True)

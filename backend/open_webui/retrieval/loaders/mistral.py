@@ -1,721 +1,634 @@
-import requests
-import aiohttp
-import asyncio
-import logging
+"""
+MinerU 文档解析加载器模块
+功能: 使用 MinerU 解析 PDF 和 Office 文档
+
+概述:
+MinerU 是一个智能文档解析工具，支持从复杂文档中提取内容。
+提供云端 API 和本地 API 两种模式。
+
+支持格式:
+- PDF
+- Word (DOC, DOCX)
+- Excel (XLS, XLSX)
+- PowerPoint (PPT, PPTX)
+- 图片等
+
+功能特点:
+- 布局分析：识别页面结构
+- 表格提取：保留表格结构
+- 公式识别：提取数学公式
+- 多语言支持：可配置语言
+
+云端 API:
+- 异步处理：上传文件后轮询获取结果
+- 支持大文件：自动分页处理
+
+本地 API:
+- 同步处理：直接返回结果
+- 自托管：数据不离开本地
+
+环境变量:
+- MINERU_API_URL: API 地址
+- MINERU_API_KEY: API 密钥（云端模式必需）
+"""
+
 import os
-import sys
 import time
-from typing import List, Dict, Any
-from contextlib import asynccontextmanager
-
+import requests
+import logging
+import tempfile
+import zipfile
+from typing import List, Optional
 from langchain_core.documents import Document
-from open_webui.env import GLOBAL_LOG_LEVEL, AIOHTTP_CLIENT_SESSION_SSL
+from fastapi import HTTPException, status
 
-logging.basicConfig(stream=sys.stdout, level=GLOBAL_LOG_LEVEL)
 log = logging.getLogger(__name__)
 
 
-class MistralLoader:
+class MinerULoader:
     """
-    Enhanced Mistral OCR loader with both sync and async support.
-    Loads documents by processing them through the Mistral OCR API.
+    MinerU 文档解析加载器
 
-    Performance Optimizations:
-    - Differentiated timeouts for different operations
-    - Intelligent retry logic with exponential backoff
-    - Memory-efficient file streaming for large files
-    - Connection pooling and keepalive optimization
-    - Semaphore-based concurrency control for batch processing
-    - Enhanced error handling with retryable error classification
+    支持云端 API 和本地 API 两种模式
+
+    云端 API:
+    - 使用异步任务处理
+    - 需要 API 密钥
+    - 适合大规模处理
+
+    本地 API:
+    - 同步处理，直接返回结果
+    - 自托管部署
+
+    Attributes:
+        file_path: 要处理的文档路径
+        api_mode: 'cloud' 或 'local'
+        api_url: API 端点地址
+        api_key: API 密钥
     """
 
     def __init__(
         self,
-        base_url: str,
-        api_key: str,
         file_path: str,
-        timeout: int = 300,  # 5 minutes default
-        max_retries: int = 3,
-        enable_debug_logging: bool = False,
+        api_mode: str = 'local',
+        api_url: str = 'http://localhost:8000',
+        api_key: str = '',
+        params: dict = None,
+        timeout: Optional[int] = 300,
     ):
         """
-        Initializes the loader with enhanced features.
+        初始化 MinerU 加载器
 
         Args:
-            api_key: Your Mistral API key.
-            file_path: The local path to the PDF file to process.
-            timeout: Request timeout in seconds.
-            max_retries: Maximum number of retry attempts.
-            enable_debug_logging: Enable detailed debug logs.
+            file_path: 要处理的文档路径
+            api_mode: API 模式 ('local' 或 'cloud')
+            api_url: API 地址
+            api_key: API 密钥（cloud 模式必需）
+            params: 额外参数（enable_ocr, enable_formula, enable_table, language 等）
+            timeout: 请求超时时间（秒）
         """
-        if not api_key:
-            raise ValueError('API key cannot be empty.')
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f'File not found at {file_path}')
-
-        self.base_url = base_url.rstrip('/') if base_url else 'https://api.mistral.ai/v1'
-        self.api_key = api_key
         self.file_path = file_path
+        self.api_mode = api_mode.lower()
+        self.api_url = api_url.rstrip('/')
+        self.api_key = api_key
         self.timeout = timeout
-        self.max_retries = max_retries
-        self.debug = enable_debug_logging
 
-        # PERFORMANCE OPTIMIZATION: Differentiated timeouts for different operations
-        # This prevents long-running OCR operations from affecting quick operations
-        # and improves user experience by failing fast on operations that should be quick
-        self.upload_timeout = min(timeout, 120)  # Cap upload at 2 minutes - prevents hanging on large files
-        self.url_timeout = 30  # URL requests should be fast - fail quickly if API is slow
-        self.ocr_timeout = timeout  # OCR can take the full timeout - this is the heavy operation
-        self.cleanup_timeout = 30  # Cleanup should be quick - don't hang on file deletion
-
-        # PERFORMANCE OPTIMIZATION: Pre-compute file info to avoid repeated filesystem calls
-        # This avoids multiple os.path.basename() and os.path.getsize() calls during processing
-        self.file_name = os.path.basename(file_path)
-        self.file_size = os.path.getsize(file_path)
-
-        # ENHANCEMENT: Added User-Agent for better API tracking and debugging
-        self.headers = {
-            'Authorization': f'Bearer {self.api_key}',
-            'User-Agent': 'OpenWebUI-MistralLoader/2.0',  # Helps API provider track usage
-        }
-
-    def _debug_log(self, message: str, *args) -> None:
-        """
-        PERFORMANCE OPTIMIZATION: Conditional debug logging for performance.
-
-        Only processes debug messages when debug mode is enabled, avoiding
-        string formatting overhead in production environments.
-        """
-        if self.debug:
-            log.debug(message, *args)
-
-    def _handle_response(self, response: requests.Response) -> Dict[str, Any]:
-        """Checks response status and returns JSON content."""
-        try:
-            response.raise_for_status()  # Raises HTTPError for bad responses (4xx or 5xx)
-            # Handle potential empty responses for certain successful requests (e.g., DELETE)
-            if response.status_code == 204 or not response.content:
-                return {}  # Return empty dict if no content
-            return response.json()
-        except requests.exceptions.HTTPError as http_err:
-            log.error(f'HTTP error occurred: {http_err} - Response: {response.text}')
-            raise
-        except requests.exceptions.RequestException as req_err:
-            log.error(f'Request exception occurred: {req_err}')
-            raise
-        except ValueError as json_err:  # Includes JSONDecodeError
-            log.error(f'JSON decode error: {json_err} - Response: {response.text}')
-            raise  # Re-raise after logging
-
-    async def _handle_response_async(self, response: aiohttp.ClientResponse) -> Dict[str, Any]:
-        """Async version of response handling with better error info."""
-        try:
-            response.raise_for_status()
-
-            # Check content type
-            content_type = response.headers.get('content-type', '')
-            if 'application/json' not in content_type:
-                if response.status == 204:
-                    return {}
-                text = await response.text()
-                raise ValueError(f'Unexpected content type: {content_type}, body: {text[:200]}...')
-
-            return await response.json()
-
-        except aiohttp.ClientResponseError as e:
-            error_text = await response.text() if response else 'No response'
-            log.error(f'HTTP {e.status}: {e.message} - Response: {error_text[:500]}')
-            raise
-        except aiohttp.ClientError as e:
-            log.error(f'Client error: {e}')
-            raise
-        except Exception as e:
-            log.error(f'Unexpected error processing response: {e}')
-            raise
-
-    def _is_retryable_error(self, error: Exception) -> bool:
-        """
-        ENHANCEMENT: Intelligent error classification for retry logic.
-
-        Determines if an error is retryable based on its type and status code.
-        This prevents wasting time retrying errors that will never succeed
-        (like authentication errors) while ensuring transient errors are retried.
-
-        Retryable errors:
-        - Network connection errors (temporary network issues)
-        - Timeouts (server might be temporarily overloaded)
-        - Server errors (5xx status codes - server-side issues)
-        - Rate limiting (429 status - temporary throttling)
-
-        Non-retryable errors:
-        - Authentication errors (401, 403 - won't fix with retry)
-        - Bad request errors (400 - malformed request)
-        - Not found errors (404 - resource doesn't exist)
-        """
-        if isinstance(error, requests.exceptions.ConnectionError):
-            return True  # Network issues are usually temporary
-        if isinstance(error, requests.exceptions.Timeout):
-            return True  # Timeouts might resolve on retry
-        if isinstance(error, requests.exceptions.HTTPError):
-            # Only retry on server errors (5xx) or rate limits (429)
-            if hasattr(error, 'response') and error.response is not None:
-                status_code = error.response.status_code
-                return status_code >= 500 or status_code == 429
-            return False
-        if isinstance(error, (aiohttp.ClientConnectionError, aiohttp.ServerTimeoutError)):
-            return True  # Async network/timeout errors are retryable
-        if isinstance(error, aiohttp.ClientResponseError):
-            return error.status >= 500 or error.status == 429
-        return False  # All other errors are non-retryable
-
-    def _retry_request_sync(self, request_func, *args, **kwargs):
-        """
-        ENHANCEMENT: Synchronous retry logic with intelligent error classification.
-
-        Uses exponential backoff with jitter to avoid thundering herd problems.
-        The wait time increases exponentially but is capped at 30 seconds to
-        prevent excessive delays. Only retries errors that are likely to succeed
-        on subsequent attempts.
-        """
-        for attempt in range(self.max_retries):
-            try:
-                return request_func(*args, **kwargs)
-            except Exception as e:
-                if attempt == self.max_retries - 1 or not self._is_retryable_error(e):
-                    raise
-
-                # PERFORMANCE OPTIMIZATION: Exponential backoff with cap
-                # Prevents overwhelming the server while ensuring reasonable retry delays
-                wait_time = min((2**attempt) + 0.5, 30)  # Cap at 30 seconds
-                log.warning(
-                    f'Retryable error (attempt {attempt + 1}/{self.max_retries}): {e}. Retrying in {wait_time}s...'
-                )
-                time.sleep(wait_time)
-
-    async def _retry_request_async(self, request_func, *args, **kwargs):
-        """
-        ENHANCEMENT: Async retry logic with intelligent error classification.
-
-        Async version of retry logic that doesn't block the event loop during
-        wait periods. Uses the same exponential backoff strategy as sync version.
-        """
-        for attempt in range(self.max_retries):
-            try:
-                return await request_func(*args, **kwargs)
-            except Exception as e:
-                if attempt == self.max_retries - 1 or not self._is_retryable_error(e):
-                    raise
-
-                # PERFORMANCE OPTIMIZATION: Non-blocking exponential backoff
-                wait_time = min((2**attempt) + 0.5, 30)  # Cap at 30 seconds
-                log.warning(
-                    f'Retryable error (attempt {attempt + 1}/{self.max_retries}): {e}. Retrying in {wait_time}s...'
-                )
-                await asyncio.sleep(wait_time)  # Non-blocking wait
-
-    def _upload_file(self) -> str:
-        """
-        PERFORMANCE OPTIMIZATION: Enhanced file upload with streaming consideration.
-
-        Uploads the file to Mistral for OCR processing (sync version).
-        Uses context manager for file handling to ensure proper resource cleanup.
-        Although streaming is not enabled for this endpoint, the file is opened
-        in a context manager to minimize memory usage duration.
-        """
-        log.info('Uploading file to Mistral API')
-        url = f'{self.base_url}/files'
-
-        def upload_request():
-            # MEMORY OPTIMIZATION: Use context manager to minimize file handle lifetime
-            # This ensures the file is closed immediately after reading, reducing memory usage
-            with open(self.file_path, 'rb') as f:
-                files = {'file': (self.file_name, f, 'application/pdf')}
-                data = {'purpose': 'ocr'}
-
-                # NOTE: stream=False is required for this endpoint
-                # The Mistral API doesn't support chunked uploads for this endpoint
-                response = requests.post(
-                    url,
-                    headers=self.headers,
-                    files=files,
-                    data=data,
-                    timeout=self.upload_timeout,  # Use specialized upload timeout
-                    stream=False,  # Keep as False for this endpoint
-                )
-
-            return self._handle_response(response)
-
-        try:
-            response_data = self._retry_request_sync(upload_request)
-            file_id = response_data.get('id')
-            if not file_id:
-                raise ValueError('File ID not found in upload response.')
-            log.info(f'File uploaded successfully. File ID: {file_id}')
-            return file_id
-        except Exception as e:
-            log.error(f'Failed to upload file: {e}')
-            raise
-
-    async def _upload_file_async(self, session: aiohttp.ClientSession) -> str:
-        """Async file upload with streaming for better memory efficiency."""
-        url = f'{self.base_url}/files'
-
-        async def upload_request():
-            # Create multipart writer for streaming upload
-            writer = aiohttp.MultipartWriter('form-data')
-
-            # Add purpose field
-            purpose_part = writer.append('ocr')
-            purpose_part.set_content_disposition('form-data', name='purpose')
-
-            # Add file part with streaming
-            file_part = writer.append_payload(
-                aiohttp.streams.FilePayload(
-                    self.file_path,
-                    filename=self.file_name,
-                    content_type='application/pdf',
-                )
-            )
-            file_part.set_content_disposition('form-data', name='file', filename=self.file_name)
-
-            self._debug_log(f'Uploading file: {self.file_name} ({self.file_size:,} bytes)')
-
-            async with session.post(
-                url,
-                data=writer,
-                headers=self.headers,
-                timeout=aiohttp.ClientTimeout(total=self.upload_timeout),
-                ssl=AIOHTTP_CLIENT_SESSION_SSL,
-            ) as response:
-                return await self._handle_response_async(response)
-
-        response_data = await self._retry_request_async(upload_request)
-
-        file_id = response_data.get('id')
-        if not file_id:
-            raise ValueError('File ID not found in upload response.')
-
-        log.info(f'File uploaded successfully. File ID: {file_id}')
-        return file_id
-
-    def _get_signed_url(self, file_id: str) -> str:
-        """Retrieves a temporary signed URL for the uploaded file (sync version)."""
-        log.info(f'Getting signed URL for file ID: {file_id}')
-        url = f'{self.base_url}/files/{file_id}/url'
-        params = {'expiry': 1}
-        signed_url_headers = {**self.headers, 'Accept': 'application/json'}
-
-        def url_request():
-            response = requests.get(url, headers=signed_url_headers, params=params, timeout=self.url_timeout)
-            return self._handle_response(response)
-
-        try:
-            response_data = self._retry_request_sync(url_request)
-            signed_url = response_data.get('url')
-            if not signed_url:
-                raise ValueError('Signed URL not found in response.')
-            log.info('Signed URL received.')
-            return signed_url
-        except Exception as e:
-            log.error(f'Failed to get signed URL: {e}')
-            raise
-
-    async def _get_signed_url_async(self, session: aiohttp.ClientSession, file_id: str) -> str:
-        """Async signed URL retrieval."""
-        url = f'{self.base_url}/files/{file_id}/url'
-        params = {'expiry': 1}
-
-        headers = {**self.headers, 'Accept': 'application/json'}
-
-        async def url_request():
-            self._debug_log(f'Getting signed URL for file ID: {file_id}')
-            async with session.get(
-                url,
-                headers=headers,
-                params=params,
-                timeout=aiohttp.ClientTimeout(total=self.url_timeout),
-                ssl=AIOHTTP_CLIENT_SESSION_SSL,
-            ) as response:
-                return await self._handle_response_async(response)
-
-        response_data = await self._retry_request_async(url_request)
-
-        signed_url = response_data.get('url')
-        if not signed_url:
-            raise ValueError('Signed URL not found in response.')
-
-        self._debug_log('Signed URL received successfully')
-        return signed_url
-
-    def _process_ocr(self, signed_url: str) -> Dict[str, Any]:
-        """Sends the signed URL to the OCR endpoint for processing (sync version)."""
-        log.info('Processing OCR via Mistral API')
-        url = f'{self.base_url}/ocr'
-        ocr_headers = {
-            **self.headers,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-        }
-        payload = {
-            'model': 'mistral-ocr-latest',
-            'document': {
-                'type': 'document_url',
-                'document_url': signed_url,
-            },
-            'include_image_base64': False,
-        }
-
-        def ocr_request():
-            response = requests.post(url, headers=ocr_headers, json=payload, timeout=self.ocr_timeout)
-            return self._handle_response(response)
-
-        try:
-            ocr_response = self._retry_request_sync(ocr_request)
-            log.info('OCR processing done.')
-            self._debug_log('OCR response: %s', ocr_response)
-            return ocr_response
-        except Exception as e:
-            log.error(f'Failed during OCR processing: {e}')
-            raise
-
-    async def _process_ocr_async(self, session: aiohttp.ClientSession, signed_url: str) -> Dict[str, Any]:
-        """Async OCR processing with timing metrics."""
-        url = f'{self.base_url}/ocr'
-
-        headers = {
-            **self.headers,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-        }
-
-        payload = {
-            'model': 'mistral-ocr-latest',
-            'document': {
-                'type': 'document_url',
-                'document_url': signed_url,
-            },
-            'include_image_base64': False,
-        }
-
-        async def ocr_request():
-            log.info('Starting OCR processing via Mistral API')
-            start_time = time.time()
-
-            async with session.post(
-                url,
-                json=payload,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=self.ocr_timeout),
-                ssl=AIOHTTP_CLIENT_SESSION_SSL,
-            ) as response:
-                ocr_response = await self._handle_response_async(response)
-
-            processing_time = time.time() - start_time
-            log.info(f'OCR processing completed in {processing_time:.2f}s')
-
-            return ocr_response
-
-        return await self._retry_request_async(ocr_request)
-
-    def _delete_file(self, file_id: str) -> None:
-        """Deletes the file from Mistral storage (sync version)."""
-        log.info(f'Deleting uploaded file ID: {file_id}')
-        url = f'{self.base_url}/files/{file_id}'
-
-        try:
-            response = requests.delete(url, headers=self.headers, timeout=self.cleanup_timeout)
-            delete_response = self._handle_response(response)
-            log.info(f'File deleted successfully: {delete_response}')
-        except Exception as e:
-            # Log error but don't necessarily halt execution if deletion fails
-            log.error(f'Failed to delete file ID {file_id}: {e}')
-
-    async def _delete_file_async(self, session: aiohttp.ClientSession, file_id: str) -> None:
-        """Async file deletion with error tolerance."""
-        try:
-
-            async def delete_request():
-                self._debug_log(f'Deleting file ID: {file_id}')
-                async with session.delete(
-                    url=f'{self.base_url}/files/{file_id}',
-                    headers=self.headers,
-                    timeout=aiohttp.ClientTimeout(total=self.cleanup_timeout),
-                    ssl=AIOHTTP_CLIENT_SESSION_SSL,
-                ) as response:
-                    return await self._handle_response_async(response)
-
-            await self._retry_request_async(delete_request)
-            self._debug_log(f'File {file_id} deleted successfully')
-
-        except Exception as e:
-            # Don't fail the entire process if cleanup fails
-            log.warning(f'Failed to delete file ID {file_id}: {e}')
-
-    @asynccontextmanager
-    async def _get_session(self):
-        """Context manager for HTTP session with optimized settings."""
-        connector = aiohttp.TCPConnector(
-            limit=20,  # Increased total connection limit for better throughput
-            limit_per_host=10,  # Increased per-host limit for API endpoints
-            ttl_dns_cache=600,  # Longer DNS cache TTL (10 minutes)
-            use_dns_cache=True,
-            keepalive_timeout=60,  # Increased keepalive for connection reuse
-            enable_cleanup_closed=True,
-            force_close=False,  # Allow connection reuse
-            resolver=aiohttp.AsyncResolver(),  # Use async DNS resolver
-        )
-
-        timeout = aiohttp.ClientTimeout(
-            total=self.timeout,
-            connect=30,  # Connection timeout
-            sock_read=60,  # Socket read timeout
-        )
-
-        async with aiohttp.ClientSession(
-            connector=connector,
-            timeout=timeout,
-            headers={'User-Agent': 'OpenWebUI-MistralLoader/2.0'},
-            raise_for_status=False,  # We handle status codes manually
-            trust_env=True,
-        ) as session:
-            yield session
-
-    def _process_results(self, ocr_response: Dict[str, Any]) -> List[Document]:
-        """Process OCR results into Document objects with enhanced metadata and memory efficiency."""
-        pages_data = ocr_response.get('pages')
-        if not pages_data:
-            log.warning('No pages found in OCR response.')
-            return [
-                Document(
-                    page_content='No text content found',
-                    metadata={'error': 'no_pages', 'file_name': self.file_name},
-                )
-            ]
-
-        documents = []
-        total_pages = len(pages_data)
-        skipped_pages = 0
-
-        # Process pages in a memory-efficient way
-        for page_data in pages_data:
-            page_content = page_data.get('markdown')
-            page_index = page_data.get('index')  # API uses 0-based index
-
-            if page_content is None or page_index is None:
-                skipped_pages += 1
-                self._debug_log(
-                    f"Skipping page due to missing 'markdown' or 'index'. Data keys: {list(page_data.keys())}"
-                )
-                continue
-
-            # Clean up content efficiently with early exit for empty content
-            if isinstance(page_content, str):
-                cleaned_content = page_content.strip()
-            else:
-                cleaned_content = str(page_content).strip()
-
-            if not cleaned_content:
-                skipped_pages += 1
-                self._debug_log(f'Skipping empty page {page_index}')
-                continue
-
-            # Create document with optimized metadata
-            documents.append(
-                Document(
-                    page_content=cleaned_content,
-                    metadata={
-                        'page': page_index,  # 0-based index from API
-                        'page_label': page_index + 1,  # 1-based label for convenience
-                        'total_pages': total_pages,
-                        'file_name': self.file_name,
-                        'file_size': self.file_size,
-                        'processing_engine': 'mistral-ocr',
-                        'content_length': len(cleaned_content),
-                    },
-                )
-            )
-
-        if skipped_pages > 0:
-            log.info(f'Processed {len(documents)} pages, skipped {skipped_pages} empty/invalid pages')
-
-        if not documents:
-            # Case where pages existed but none had valid markdown/index
-            log.warning('OCR response contained pages, but none had valid content/index.')
-            return [
-                Document(
-                    page_content='No valid text content found in document',
-                    metadata={
-                        'error': 'no_valid_pages',
-                        'total_pages': total_pages,
-                        'file_name': self.file_name,
-                    },
-                )
-            ]
-
-        return documents
+        # Parse params dict with defaults
+        self.params = params or {}
+        self.enable_ocr = params.get('enable_ocr', False)
+        self.enable_formula = params.get('enable_formula', True)
+        self.enable_table = params.get('enable_table', True)
+        self.language = params.get('language', 'en')
+        self.model_version = params.get('model_version', 'pipeline')
+
+        self.page_ranges = self.params.pop('page_ranges', '')
+
+        # Validate API mode
+        if self.api_mode not in ['local', 'cloud']:
+            raise ValueError(f"Invalid API mode: {self.api_mode}. Must be 'local' or 'cloud'")
+
+        # Validate Cloud API requirements
+        if self.api_mode == 'cloud' and not self.api_key:
+            raise ValueError('API key is required for Cloud API mode')
 
     def load(self) -> List[Document]:
         """
-        Executes the full OCR workflow: upload, get URL, process OCR, delete file.
-        Synchronous version for backward compatibility.
+        主入口：加载并解析文档
+
+        根据 api_mode 路由到不同的处理方式
 
         Returns:
-            A list of Document objects, one for each page processed.
-        """
-        file_id = None
-        start_time = time.time()
+            Document 对象列表
 
+        Raises:
+            HTTPException: 处理失败时抛出
+        """
+        """
+        Main entry point for loading and parsing the document.
+        Routes to Cloud or Local API based on api_mode.
+        """
         try:
-            # 1. Upload file
-            file_id = self._upload_file()
-
-            # 2. Get Signed URL
-            signed_url = self._get_signed_url(file_id)
-
-            # 3. Process OCR
-            ocr_response = self._process_ocr(signed_url)
-
-            # 4. Process results
-            documents = self._process_results(ocr_response)
-
-            total_time = time.time() - start_time
-            log.info(f'Sync OCR workflow completed in {total_time:.2f}s, produced {len(documents)} documents')
-
-            return documents
-
+            if self.api_mode == 'cloud':
+                return self._load_cloud_api()
+            else:
+                return self._load_local_api()
         except Exception as e:
-            total_time = time.time() - start_time
-            log.error(f'An error occurred during the loading process after {total_time:.2f}s: {e}')
-            # Return an error document on failure
-            return [
-                Document(
-                    page_content=f'Error during processing: {e}',
-                    metadata={
-                        'error': 'processing_failed',
-                        'file_name': self.file_name,
-                    },
-                )
-            ]
-        finally:
-            # 5. Delete file (attempt even if prior steps failed after upload)
-            if file_id:
-                try:
-                    self._delete_file(file_id)
-                except Exception as del_e:
-                    # Log deletion error, but don't overwrite original error if one occurred
-                    log.error(f'Cleanup error: Could not delete file ID {file_id}. Reason: {del_e}')
+            log.error(f'Error loading document with MinerU: {e}')
+            raise
 
-    async def load_async(self) -> List[Document]:
+    def _load_local_api(self) -> List[Document]:
         """
-        Asynchronous OCR workflow execution with optimized performance.
+        使用本地 API 加载文档（同步）
+
+        向 /file_parse 端点发送文件，获取即时响应
 
         Returns:
-            A list of Document objects, one for each page processed.
+            Document 对象列表
         """
-        file_id = None
-        start_time = time.time()
+        """
+        Load document using Local API (synchronous).
+        Posts file to /file_parse endpoint and gets immediate response.
+        """
+        log.info(f'Using MinerU Local API at {self.api_url}')
+
+        filename = os.path.basename(self.file_path)
+
+        # Build form data for Local API
+        form_data = {
+            **self.params,
+            'return_md': 'true',
+        }
+
+        # Page ranges (Local API uses start_page_id and end_page_id)
+        if self.page_ranges:
+            # For simplicity, if page_ranges is specified, log a warning
+            # Full page range parsing would require parsing the string
+            log.warning(
+                f"Page ranges '{self.page_ranges}' specified but Local API uses different format. "
+                'Consider using start_page_id/end_page_id parameters if needed.'
+            )
 
         try:
-            async with self._get_session() as session:
-                # 1. Upload file with streaming
-                file_id = await self._upload_file_async(session)
+            with open(self.file_path, 'rb') as f:
+                files = {'files': (filename, f, 'application/octet-stream')}
 
-                # 2. Get signed URL
-                signed_url = await self._get_signed_url_async(session, file_id)
+                log.info(f'Sending file to MinerU Local API: {filename}')
+                log.debug(f'Local API parameters: {form_data}')
 
-                # 3. Process OCR
-                ocr_response = await self._process_ocr_async(session, signed_url)
-
-                # 4. Process results
-                documents = self._process_results(ocr_response)
-
-                total_time = time.time() - start_time
-                log.info(f'Async OCR workflow completed in {total_time:.2f}s, produced {len(documents)} documents')
-
-                return documents
-
-        except Exception as e:
-            total_time = time.time() - start_time
-            log.error(f'Async OCR workflow failed after {total_time:.2f}s: {e}')
-            return [
-                Document(
-                    page_content=f'Error during OCR processing: {e}',
-                    metadata={
-                        'error': 'processing_failed',
-                        'file_name': self.file_name,
-                    },
+                response = requests.post(
+                    f'{self.api_url}/file_parse',
+                    data=form_data,
+                    files=files,
+                    timeout=self.timeout,
                 )
-            ]
-        finally:
-            # 5. Cleanup - always attempt file deletion
-            if file_id:
-                try:
-                    async with self._get_session() as session:
-                        await self._delete_file_async(session, file_id)
-                except Exception as cleanup_error:
-                    log.error(f'Cleanup failed for file ID {file_id}: {cleanup_error}')
+                response.raise_for_status()
 
-    @staticmethod
-    async def load_multiple_async(
-        loaders: List['MistralLoader'],
-        max_concurrent: int = 5,  # Limit concurrent requests
-    ) -> List[List[Document]]:
+        except FileNotFoundError:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f'File not found: {self.file_path}')
+        except requests.Timeout:
+            raise HTTPException(
+                status.HTTP_504_GATEWAY_TIMEOUT,
+                detail='MinerU Local API request timed out',
+            )
+        except requests.HTTPError as e:
+            error_detail = f'MinerU Local API request failed: {e}'
+            if e.response is not None:
+                try:
+                    error_data = e.response.json()
+                    error_detail += f' - {error_data}'
+                except Exception:
+                    error_detail += f' - {e.response.text}'
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=error_detail)
+        except Exception as e:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f'Error calling MinerU Local API: {str(e)}',
+            )
+
+        # Parse response
+        try:
+            result = response.json()
+        except ValueError as e:
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                detail=f'Invalid JSON response from MinerU Local API: {e}',
+            )
+
+        # Extract markdown content from response
+        if 'results' not in result:
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                detail="MinerU Local API response missing 'results' field",
+            )
+
+        results = result['results']
+        if not results:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail='MinerU returned empty results',
+            )
+
+        # Get the first (and typically only) result
+        file_result = list(results.values())[0]
+        markdown_content = file_result.get('md_content', '')
+
+        if not markdown_content:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail='MinerU returned empty markdown content',
+            )
+
+        log.info(f'Successfully parsed document with MinerU Local API: {filename}')
+
+        # Create metadata
+        metadata = {
+            'source': filename,
+            'api_mode': 'local',
+            'backend': result.get('backend', 'unknown'),
+            'version': result.get('version', 'unknown'),
+        }
+
+        return [Document(page_content=markdown_content, metadata=metadata)]
+
+    def _load_cloud_api(self) -> List[Document]:
         """
-        Process multiple files concurrently with controlled concurrency.
+        使用云端 API 加载文档（异步）
+
+        流程：
+        1. 请求预签名上传 URL
+        2. 上传文件到预签名 URL
+        3. 轮询处理状态
+        4. 下载并提取结果
+
+        Returns:
+            Document 对象列表
+        """
+        """
+        Load document using Cloud API (asynchronous).
+        Uses batch upload endpoint to avoid need for public file URLs.
+        """
+        log.info(f'Using MinerU Cloud API at {self.api_url}')
+
+        filename = os.path.basename(self.file_path)
+
+        # Step 1: Request presigned upload URL
+        batch_id, upload_url = self._request_upload_url(filename)
+
+        # Step 2: Upload file to presigned URL
+        self._upload_to_presigned_url(upload_url)
+
+        # Step 3: Poll for results
+        result = self._poll_batch_status(batch_id, filename)
+
+        # Step 4: Download and extract markdown from ZIP
+        markdown_content = self._download_and_extract_zip(result['full_zip_url'], filename)
+
+        log.info(f'Successfully parsed document with MinerU Cloud API: {filename}')
+
+        # Create metadata
+        metadata = {
+            'source': filename,
+            'api_mode': 'cloud',
+            'batch_id': batch_id,
+        }
+
+        return [Document(page_content=markdown_content, metadata=metadata)]
+
+    def _request_upload_url(self, filename: str) -> tuple:
+        """
+        请求预签名上传 URL
 
         Args:
-            loaders: List of MistralLoader instances
-            max_concurrent: Maximum number of concurrent requests
+            filename: 要上传的文件名
 
         Returns:
-            List of document lists, one for each loader
+            (batch_id, upload_url) 元组
         """
-        if not loaders:
-            return []
+        """
+        Request presigned upload URL from Cloud API.
+        Returns (batch_id, upload_url).
+        """
+        headers = {
+            'Authorization': f'Bearer {self.api_key}',
+            'Content-Type': 'application/json',
+        }
 
-        log.info(f'Starting concurrent processing of {len(loaders)} files with max {max_concurrent} concurrent')
-        start_time = time.time()
+        # Build request body
+        request_body = {
+            **self.params,
+            'files': [
+                {
+                    'name': filename,
+                    'is_ocr': self.enable_ocr,
+                }
+            ],
+        }
 
-        # Use semaphore to control concurrency
-        semaphore = asyncio.Semaphore(max_concurrent)
+        # Add page ranges if specified
+        if self.page_ranges:
+            request_body['files'][0]['page_ranges'] = self.page_ranges
 
-        async def process_with_semaphore(loader: 'MistralLoader') -> List[Document]:
-            async with semaphore:
-                return await loader.load_async()
+        log.info(f'Requesting upload URL for: {filename}')
+        log.debug(f'Cloud API request body: {request_body}')
 
-        # Process all files with controlled concurrency
-        tasks = [process_with_semaphore(loader) for loader in loaders]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            response = requests.post(
+                f'{self.api_url}/file-urls/batch',
+                headers=headers,
+                json=request_body,
+                timeout=30,
+            )
+            response.raise_for_status()
+        except requests.HTTPError as e:
+            error_detail = f'Failed to request upload URL: {e}'
+            if e.response is not None:
+                try:
+                    error_data = e.response.json()
+                    error_detail += f' - {error_data.get("msg", error_data)}'
+                except Exception:
+                    error_detail += f' - {e.response.text}'
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=error_detail)
+        except Exception as e:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f'Error requesting upload URL: {str(e)}',
+            )
 
-        # Handle any exceptions in results
-        processed_results = []
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                log.error(f'File {i} failed: {result}')
-                processed_results.append(
-                    [
-                        Document(
-                            page_content=f'Error processing file: {result}',
-                            metadata={
-                                'error': 'batch_processing_failed',
-                                'file_index': i,
-                            },
-                        )
-                    ]
+        try:
+            result = response.json()
+        except ValueError as e:
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                detail=f'Invalid JSON response: {e}',
+            )
+
+        # Check for API error response
+        if result.get('code') != 0:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f'MinerU Cloud API error: {result.get("msg", "Unknown error")}',
+            )
+
+        data = result.get('data', {})
+        batch_id = data.get('batch_id')
+        file_urls = data.get('file_urls', [])
+
+        if not batch_id or not file_urls:
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                detail='MinerU Cloud API response missing batch_id or file_urls',
+            )
+
+        upload_url = file_urls[0]
+        log.info(f'Received upload URL for batch: {batch_id}')
+
+        return batch_id, upload_url
+
+    def _upload_to_presigned_url(self, upload_url: str) -> None:
+        """
+        上传文件到预签名 URL
+
+        Args:
+            upload_url: 预签名上传 URL
+        """
+        """
+        Upload file to presigned URL (no authentication needed).
+        """
+        log.info(f'Uploading file to presigned URL')
+
+        try:
+            with open(self.file_path, 'rb') as f:
+                response = requests.put(
+                    upload_url,
+                    data=f,
+                    timeout=self.timeout,
                 )
+                response.raise_for_status()
+        except FileNotFoundError:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f'File not found: {self.file_path}')
+        except requests.Timeout:
+            raise HTTPException(
+                status.HTTP_504_GATEWAY_TIMEOUT,
+                detail='File upload to presigned URL timed out',
+            )
+        except requests.HTTPError as e:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f'Failed to upload file to presigned URL: {e}',
+            )
+        except Exception as e:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f'Error uploading file: {str(e)}',
+            )
+
+        log.info('File uploaded successfully')
+
+    def _poll_batch_status(self, batch_id: str, filename: str) -> dict:
+        """
+        轮询批处理状态直到完成
+
+        Args:
+            batch_id: 批处理 ID
+            filename: 文件名（用于在结果中查找）
+
+        Returns:
+            文件结果字典
+
+        Raises:
+            HTTPException: 处理失败或超时
+        """
+        """
+        Poll batch status until completion.
+        Returns the result dict for the file.
+        """
+        headers = {
+            'Authorization': f'Bearer {self.api_key}',
+        }
+
+        max_iterations = 300  # 10 minutes max (2 seconds per iteration)
+        poll_interval = 2  # seconds
+
+        log.info(f'Polling batch status: {batch_id}')
+
+        for iteration in range(max_iterations):
+            try:
+                response = requests.get(
+                    f'{self.api_url}/extract-results/batch/{batch_id}',
+                    headers=headers,
+                    timeout=30,
+                )
+                response.raise_for_status()
+            except requests.HTTPError as e:
+                error_detail = f'Failed to poll batch status: {e}'
+                if e.response is not None:
+                    try:
+                        error_data = e.response.json()
+                        error_detail += f' - {error_data.get("msg", error_data)}'
+                    except Exception:
+                        error_detail += f' - {e.response.text}'
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=error_detail)
+            except Exception as e:
+                raise HTTPException(
+                    status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f'Error polling batch status: {str(e)}',
+                )
+
+            try:
+                result = response.json()
+            except ValueError as e:
+                raise HTTPException(
+                    status.HTTP_502_BAD_GATEWAY,
+                    detail=f'Invalid JSON response while polling: {e}',
+                )
+
+            # Check for API error response
+            if result.get('code') != 0:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    detail=f'MinerU Cloud API error: {result.get("msg", "Unknown error")}',
+                )
+
+            data = result.get('data', {})
+            extract_result = data.get('extract_result', [])
+
+            # Find our file in the batch results
+            file_result = None
+            for item in extract_result:
+                if item.get('file_name') == filename:
+                    file_result = item
+                    break
+
+            if not file_result:
+                raise HTTPException(
+                    status.HTTP_502_BAD_GATEWAY,
+                    detail=f'File {filename} not found in batch results',
+                )
+
+            state = file_result.get('state')
+
+            if state == 'done':
+                log.info(f'Processing complete for {filename}')
+                return file_result
+            elif state == 'failed':
+                error_msg = file_result.get('err_msg', 'Unknown error')
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    detail=f'MinerU processing failed: {error_msg}',
+                )
+            elif state in ['waiting-file', 'pending', 'running', 'converting']:
+                # Still processing
+                if iteration % 10 == 0:  # Log every 20 seconds
+                    log.info(f'Processing status: {state} (iteration {iteration + 1}/{max_iterations})')
+                time.sleep(poll_interval)
             else:
-                processed_results.append(result)
+                log.warning(f'Unknown state: {state}')
+                time.sleep(poll_interval)
 
-        # MONITORING: Log comprehensive batch processing statistics
-        total_time = time.time() - start_time
-        total_docs = sum(len(docs) for docs in processed_results)
-        success_count = sum(1 for result in results if not isinstance(result, Exception))
-        failure_count = len(results) - success_count
-
-        log.info(
-            f'Batch processing completed in {total_time:.2f}s: '
-            f'{success_count} files succeeded, {failure_count} files failed, '
-            f'produced {total_docs} total documents'
+        # Timeout
+        raise HTTPException(
+            status.HTTP_504_GATEWAY_TIMEOUT,
+            detail='MinerU processing timed out after 10 minutes',
         )
 
-        return processed_results
+    def _download_and_extract_zip(self, zip_url: str, filename: str) -> str:
+        """
+        从 CDN 下载 ZIP 文件并提取 markdown 内容
+
+        Args:
+            zip_url: ZIP 文件 URL
+            filename: 原始文件名（用于查找对应的 markdown）
+
+        Returns:
+            markdown 内容字符串
+        """
+        """
+        Download ZIP file from CDN and extract markdown content.
+        Returns the markdown content as a string.
+        """
+        log.info(f'Downloading results from: {zip_url}')
+
+        try:
+            response = requests.get(zip_url, timeout=60)
+            response.raise_for_status()
+        except requests.HTTPError as e:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f'Failed to download results ZIP: {e}',
+            )
+        except Exception as e:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f'Error downloading results: {str(e)}',
+            )
+
+        # Save ZIP to temporary file and extract
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp_zip:
+                tmp_zip.write(response.content)
+                tmp_zip_path = tmp_zip.name
+
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                # Extract ZIP
+                with zipfile.ZipFile(tmp_zip_path, 'r') as zip_ref:
+                    zip_ref.extractall(tmp_dir)
+
+                # Find markdown file - search recursively for any .md file
+                markdown_content = None
+                found_md_path = None
+
+                # First, list all files in the ZIP for debugging
+                all_files = []
+                for root, dirs, files in os.walk(tmp_dir):
+                    for file in files:
+                        full_path = os.path.join(root, file)
+                        all_files.append(full_path)
+                        # Look for any .md file
+                        if file.endswith('.md'):
+                            found_md_path = full_path
+                            log.info(f'Found markdown file at: {full_path}')
+                            try:
+                                with open(full_path, 'r', encoding='utf-8') as f:
+                                    markdown_content = f.read()
+                                if markdown_content:  # Use the first non-empty markdown file
+                                    break
+                            except Exception as e:
+                                log.warning(f'Failed to read {full_path}: {e}')
+                    if markdown_content:
+                        break
+
+                if markdown_content is None:
+                    log.error(f'Available files in ZIP: {all_files}')
+                    # Try to provide more helpful error message
+                    md_files = [f for f in all_files if f.endswith('.md')]
+                    if md_files:
+                        error_msg = f"Found .md files but couldn't read them: {md_files}"
+                    else:
+                        error_msg = f'No .md files found in ZIP. Available files: {all_files}'
+                    raise HTTPException(
+                        status.HTTP_502_BAD_GATEWAY,
+                        detail=error_msg,
+                    )
+
+            # Clean up temporary ZIP file
+            os.unlink(tmp_zip_path)
+
+        except zipfile.BadZipFile as e:
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                detail=f'Invalid ZIP file received: {e}',
+            )
+        except Exception as e:
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f'Error extracting ZIP: {str(e)}',
+            )
+
+        if not markdown_content:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail='Extracted markdown content is empty',
+            )
+
+        log.info(f'Successfully extracted markdown content ({len(markdown_content)} characters)')
+        return markdown_content

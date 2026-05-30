@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - Models
+  文件路径: src/lib/components/chat/MessageInput/Commands/Models.svelte
+-->
+
+
 	import Fuse from 'fuse.js';
 
 	import { createEventDispatcher, onDestroy, onMount } from 'svelte';

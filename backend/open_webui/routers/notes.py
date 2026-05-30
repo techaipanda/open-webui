@@ -1,3 +1,9 @@
+"""
+路由器: 笔记模块
+API 前缀: /api/notes
+功能: 用户笔记的创建、阅读、更新、删除、置顶和分享管理
+"""
+
 import json
 import logging
 from typing import Optional
@@ -43,6 +49,15 @@ router = APIRouter()
 
 
 def _truncate_note_data(data: Optional[dict], max_length: int = 1000) -> Optional[dict]:
+    """
+    截断笔记数据
+
+    参数:
+        data: 笔记数据字典
+        max_length: 最大内容长度,默认1000
+
+    功能: 截断笔记内容以减少响应数据量,只保留前 max_length 个字符
+    """
     if not data:
         return data
     md = (data.get('content') or {}).get('md') or ''
@@ -71,6 +86,14 @@ async def get_notes(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    """
+    获取用户笔记列表
+
+    参数:
+        page: 页码(可选),每页60条
+
+    功能: 返回用户的笔记列表,支持分页,包含笔记是否被置顶的信息
+    """
     if user.role != 'admin' and not await has_permission(
         user.id, 'features.notes', request.app.state.config.USER_PERMISSIONS, db=db
     ):
@@ -119,6 +142,11 @@ async def get_pinned_notes(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    """
+    获取用户置顶笔记列表
+
+    功能: 返回用户所有置顶的笔记
+    """
     if user.role != 'admin' and not await has_permission(
         user.id, 'features.notes', request.app.state.config.USER_PERMISSIONS, db=db
     ):
@@ -160,6 +188,19 @@ async def search_notes(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    """
+    搜索笔记
+
+    参数:
+        query: 搜索关键词
+        view_option: 视图选项
+        permission: 权限过滤
+        order_by: 排序字段
+        direction: 排序方向
+        page: 页码,默认1
+
+    功能: 根据多种过滤条件搜索笔记,支持分页和排序
+    """
     if user.role != 'admin' and not await has_permission(
         user.id, 'features.notes', request.app.state.config.USER_PERMISSIONS, db=db
     ):
@@ -213,6 +254,14 @@ async def create_new_note(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    """
+    创建新笔记
+
+    参数:
+        form_data: 包含笔记标题、内容、访问权限等信息的表单数据
+
+    功能: 创建新笔记,根据用户权限过滤访问授权列表
+    """
     if user.role != 'admin' and not await has_permission(
         user.id, 'features.notes', request.app.state.config.USER_PERMISSIONS, db=db
     ):
@@ -254,6 +303,14 @@ async def get_note_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    """
+    获取指定笔记详情
+
+    参数:
+        id: 笔记ID
+
+    功能: 返回指定笔记的完整信息,包含写权限标识
+    """
     if user.role != 'admin' and not await has_permission(
         user.id, 'features.notes', request.app.state.config.USER_PERMISSIONS, db=db
     ):
@@ -313,6 +370,15 @@ async def update_note_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    """
+    更新指定笔记
+
+    参数:
+        id: 笔记ID
+        form_data: 包含更新内容的表单数据
+
+    功能: 更新笔记内容和访问权限,通过 WebSocket 通知笔记更新事件
+    """
     if user.role != 'admin' and not await has_permission(
         user.id, 'features.notes', request.app.state.config.USER_PERMISSIONS, db=db
     ):
@@ -380,6 +446,15 @@ async def update_note_access_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    """
+    更新笔记访问权限
+
+    参数:
+        id: 笔记ID
+        form_data: 访问权限授权列表
+
+    功能: 更新笔记的访问授权,控制哪些用户/组可以访问
+    """
     if user.role != 'admin' and not await has_permission(
         user.id, 'features.notes', request.app.state.config.USER_PERMISSIONS, db=db
     ):
@@ -432,6 +507,14 @@ async def pin_note_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    """
+    置顶/取消置顶笔记
+
+    参数:
+        id: 笔记ID
+
+    功能: 切换笔记的置顶状态
+    """
     if user.role != 'admin' and not await has_permission(
         user.id, 'features.notes', request.app.state.config.USER_PERMISSIONS, db=db
     ):
@@ -474,6 +557,14 @@ async def delete_note_by_id(
     user=Depends(get_verified_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    """
+    删除指定笔记
+
+    参数:
+        id: 笔记ID
+
+    功能: 删除笔记,返回删除是否成功
+    """
     if user.role != 'admin' and not await has_permission(
         user.id, 'features.notes', request.app.state.config.USER_PERMISSIONS, db=db
     ):

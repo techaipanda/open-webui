@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - InputVariablesModal
+  文件路径: src/lib/components/chat/MessageInput/InputVariablesModal.svelte
+-->
+
+
 	import { getContext, onMount, tick } from 'svelte';
 	import { models, config } from '$lib/stores';
 

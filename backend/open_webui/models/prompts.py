@@ -1,3 +1,11 @@
+"""
+数据模型: 提示词模板模块
+数据库表: prompt
+功能: 管理可复用的提示词模板，支持命令快捷调用和版本控制
+关系: 与 User (多对一), 与 PromptHistory (一对多), 与 AccessGrant (多对多)
+说明: 提示词模板通过 command 字段作为快捷命令触发，支持标签分类和访问控制
+"""
+
 import json
 import time
 import uuid
@@ -23,6 +31,25 @@ from sqlalchemy import BigInteger, Boolean, Column, Text, JSON
 
 
 class Prompt(Base):
+    """
+    提示词模板数据模型（SQLAlchemy ORM）
+
+    表名: prompt
+
+    字段说明:
+        id: UUID 主键，唯一标识模板
+        command: 快捷命令（唯一索引）
+        user_id: 创建者用户 ID
+        name: 模板名称
+        content: 模板内容
+        data: 附加数据
+        meta: 元数据
+        tags: 标签列表
+        is_active: 是否激活
+        version_id: 当前生产版本 ID
+        created_at: 创建时间
+        updated_at: 更新时间
+    """
     __tablename__ = 'prompt'
 
     id = Column(Text, primary_key=True)

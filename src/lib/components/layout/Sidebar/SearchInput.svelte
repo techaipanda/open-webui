@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 布局组件
+  功能描述: 布局组件 - SearchInput
+  文件路径: src/lib/components/layout/Sidebar/SearchInput.svelte
+-->
+
+
 	import { getAllTags } from '$lib/apis/chats';
 	import { folders, tags } from '$lib/stores';
 	import { getContext, createEventDispatcher, onMount, onDestroy, tick } from 'svelte';

@@ -1,4 +1,11 @@
 <script>
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - Settings
+  文件路径: src/lib/components/admin/Settings.svelte
+-->
+
+
 	import { getContext, tick, onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';

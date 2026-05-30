@@ -1,3 +1,11 @@
+"""
+数据模型: 工具模块
+数据库表: tool
+功能: 管理 OpenAPI 工具定义，包含工具规范（specs）和配置阀门（valves）
+关系: 与 User (多对一)
+说明: 工具是 AI 可调用的外部 API，带有描述性元数据和运行时配置
+"""
+
 import logging
 import time
 from typing import Optional
@@ -22,6 +30,22 @@ log = logging.getLogger(__name__)
 
 
 class Tool(Base):
+    """
+    工具数据模型（SQLAlchemy ORM）
+
+    表名: tool
+
+    字段说明:
+        id: 工具唯一标识
+        user_id: 创建者用户 ID
+        name: 工具名称
+        content: 工具内容/代码
+        specs: OpenAPI 规范定义
+        meta: 元数据（description、manifest）
+        valves: 阀门配置
+        updated_at: 更新时间
+        created_at: 创建时间
+    """
     __tablename__ = 'tool'
 
     id = Column(String, primary_key=True, unique=True)

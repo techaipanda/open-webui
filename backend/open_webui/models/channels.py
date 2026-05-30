@@ -1,3 +1,11 @@
+"""
+数据模型: 频道模块
+数据库表: channel, channel_member, channel_file, channel_webhook
+功能: 管理聊天频道（含群组、私信频道），支持成员管理、文件共享和 Webhook 集成
+关系: 与 User (多对一), 与 ChannelMember (一对多), 与 ChannelFile (一对多), 与 ChannelWebhook (一对多)
+说明: 频道类型包括标准频道、群组（group）和私信（dm），支持软删除（deleted_at）和归档（archived_at）
+"""
+
 import json
 import secrets
 import time
@@ -36,6 +44,28 @@ from sqlalchemy import (
 
 
 class Channel(Base):
+    """
+    频道数据模型（SQLAlchemy ORM）
+
+    表名: channel
+
+    字段说明:
+        id: UUID 主键，唯一标识频道
+        user_id: 创建者用户 ID
+        type: 频道类型（group/dm 或 null 表示标准频道）
+        name: 频道名称
+        description: 频道描述
+        is_private: 是否为私有频道
+        data: 配置数据
+        meta: 元数据
+        created_at: 创建时间（纳秒）
+        updated_at: 更新时间（纳秒）
+        updated_by: 更新者用户 ID
+        archived_at: 归档时间（纳秒，可选）
+        archived_by: 归档操作者 ID
+        deleted_at: 删除时间（软删除，纳秒）
+        deleted_by: 删除操作者 ID
+    """
     __tablename__ = 'channel'
 
     id = Column(Text, primary_key=True, unique=True)
@@ -93,6 +123,30 @@ class ChannelModel(BaseModel):
 
 
 class ChannelMember(Base):
+    """
+    频道成员数据模型（SQLAlchemy ORM）
+
+    表名: channel_member
+
+    字段说明:
+        id: UUID 主键，唯一标识成员记录
+        channel_id: 所属频道 ID
+        user_id: 成员用户 ID
+        role: 角色（manager/null）
+        status: 状态（joined/left）
+        is_active: 是否激活
+        is_channel_muted: 是否静音
+        is_channel_pinned: 是否置顶
+        data: 配置数据
+        meta: 元数据
+        invited_at: 受邀请时间（纳秒）
+        invited_by: 邀请人用户 ID
+        joined_at: 加入时间（纳秒）
+        left_at: 离开时间（纳秒，可选）
+        last_read_at: 最后阅读时间（纳秒）
+        created_at: 创建时间（纳秒）
+        updated_at: 更新时间（纳秒）
+    """
     __tablename__ = 'channel_member'
 
     id = Column(Text, primary_key=True, unique=True)
@@ -153,6 +207,22 @@ class ChannelMemberModel(BaseModel):
 
 
 class ChannelFile(Base):
+    """
+    频道文件附件数据模型（SQLAlchemy ORM）
+
+    表名: channel_file
+
+    字段说明:
+        id: UUID 主键，唯一标识记录
+        user_id: 上传者用户 ID
+        channel_id: 所属频道 ID
+        message_id: 关联的消息 ID（可关联到 chats 表的消息）
+        file_id: 文件 ID（关联 file 表）
+        created_at: 创建时间
+        updated_at: 更新时间
+
+    约束: 唯一约束 (channel_id, file_id)
+    """
     __tablename__ = 'channel_file'
 
     id = Column(Text, unique=True, primary_key=True)
@@ -182,6 +252,22 @@ class ChannelFileModel(BaseModel):
 
 
 class ChannelWebhook(Base):
+    """
+    频道 Webhook 数据模型（SQLAlchemy ORM）
+
+    表名: channel_webhook
+
+    字段说明:
+        id: UUID 主键，唯一标识 Webhook
+        channel_id: 所属频道 ID
+        user_id: 创建者用户 ID
+        name: Webhook 名称
+        profile_image_url: 头像 URL
+        token: Webhook 访问令牌
+        last_used_at: 最后使用时间（纳秒）
+        created_at: 创建时间（纳秒）
+        updated_at: 更新时间（纳秒）
+    """
     __tablename__ = 'channel_webhook'
 
     id = Column(Text, primary_key=True, unique=True)

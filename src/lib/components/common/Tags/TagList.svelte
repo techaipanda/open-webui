@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - TagList
+  文件路径: src/lib/components/common/Tags/TagList.svelte
+-->
+
+
 	import { createEventDispatcher } from 'svelte';
 	import { getContext } from 'svelte';
 	const i18n = getContext('i18n');

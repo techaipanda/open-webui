@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - PortPreview
+  文件路径: src/lib/components/chat/FileNav/PortPreview.svelte
+-->
+
+
 	import { getContext } from 'svelte';
 	import { getPortProxyUrl } from '$lib/apis/terminal';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';

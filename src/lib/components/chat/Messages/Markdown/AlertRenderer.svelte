@@ -1,4 +1,11 @@
 <script lang="ts" context="module">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - AlertRenderer
+  文件路径: src/lib/components/chat/Messages/Markdown/AlertRenderer.svelte
+-->
+
+
 	import { marked, type Token } from 'marked';
 
 	type AlertType = 'NOTE' | 'TIP' | 'IMPORTANT' | 'WARNING' | 'CAUTION';

@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - CellEditor
+  文件路径: src/lib/components/chat/FileNav/CellEditor.svelte
+-->
+
+
 	import '$lib/utils/codemirror';
 	import { basicSetup, EditorView } from 'codemirror';
 	import { keymap } from '@codemirror/view';

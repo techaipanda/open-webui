@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 布局组件
+  功能描述: 布局组件 - FolderModal
+  文件路径: src/lib/components/layout/Sidebar/Folders/FolderModal.svelte
+-->
+
+
 	import { getContext, createEventDispatcher, onMount, tick } from 'svelte';
 
 	import Spinner from '$lib/components/common/Spinner.svelte';

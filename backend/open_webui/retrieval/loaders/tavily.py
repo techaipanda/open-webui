@@ -1,6 +1,27 @@
+"""
+Tavily 网页提取加载器模块
+功能: 使用 Tavily Extract API 从网页中提取内容
+
+概述:
+Tavily 是一个专为 AI 应用设计的搜索和提取服务。
+TavilyLoader 使用 Tavily 的 Extract API 从 URL 中提取内容。
+
+功能:
+- 批量提取：支持同时处理多个 URL
+- 深度提取：支持基础和高级提取模式
+- 失败处理：支持跳过失败的 URL 继续处理
+
+提取模式:
+- basic: 基础提取，1 credit/5 URLs
+- advanced: 高级提取，包含表格和嵌入内容，2 credits/5 URLs
+
+环境变量:
+- TAVILY_API_KEY: Tavily API 密钥
+"""
+
 import requests
 import logging
-from typing import Iterator, List, Literal, Union
+from typing import Iterator, List, Union, Literal
 
 from langchain_core.document_loaders import BaseLoader
 from langchain_core.documents import Document
@@ -9,16 +30,17 @@ log = logging.getLogger(__name__)
 
 
 class TavilyLoader(BaseLoader):
-    """Extract web page content from URLs using Tavily Extract API.
+    """
+    Tavily 网页提取加载器
 
-    This is a LangChain document loader that uses Tavily's Extract API to
-    retrieve content from web pages and return it as Document objects.
+    使用 Tavily Extract API 从 URL 中提取内容
 
-    Args:
-        urls: URL or list of URLs to extract content from.
-        api_key: The Tavily API key.
-        extract_depth: Depth of extraction, either "basic" or "advanced".
-        continue_on_failure: Whether to continue if extraction of a URL fails.
+    Attributes:
+        urls: URL 列表
+        api_key: Tavily API 密钥
+        extract_depth: 提取深度（'basic' 或 'advanced'）
+        continue_on_failure: 失败是否继续处理
+        api_url: Tavily Extract API 端点
     """
 
     def __init__(
@@ -28,6 +50,15 @@ class TavilyLoader(BaseLoader):
         extract_depth: Literal['basic', 'advanced'] = 'basic',
         continue_on_failure: bool = True,
     ) -> None:
+        """
+        初始化 Tavily 加载器
+
+        Args:
+            urls: 单个 URL 或 URL 列表
+            api_key: Tavily API 密钥
+            extract_depth: 提取深度（'basic' 或 'advanced'）
+            continue_on_failure: 失败是否继续处理其他 URL
+        """
         """Initialize Tavily Extract client.
 
         Args:
@@ -51,6 +82,14 @@ class TavilyLoader(BaseLoader):
         self.api_url = 'https://api.tavily.com/extract'
 
     def lazy_load(self) -> Iterator[Document]:
+        """
+        懒加载文档
+
+        批量处理 URL，每批 20 个
+
+        Yields:
+            Document: 提取的网页内容
+        """
         """Extract and yield documents from the URLs using Tavily Extract API."""
         batch_size = 20
         for i in range(0, len(self.urls), batch_size):

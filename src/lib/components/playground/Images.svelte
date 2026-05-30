@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: Playground组件
+  功能描述: Playground组件 - Images
+  文件路径: src/lib/components/playground/Images.svelte
+-->
+
+
 	import { toast } from 'svelte-sonner';
 	import { onMount, getContext } from 'svelte';
 	import { goto } from '$app/navigation';

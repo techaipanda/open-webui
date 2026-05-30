@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 导入模态框 - 导入聊天/配置等
+  文件路径: src/lib/components/ImportModal.svelte
+-->
+
+
 	import { toast } from 'svelte-sonner';
 	import { getContext, onMount } from 'svelte';
 	const i18n = getContext('i18n');

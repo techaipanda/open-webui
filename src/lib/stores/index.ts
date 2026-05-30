@@ -7,6 +7,11 @@ import type { AudioQueue } from '$lib/utils/audio';
 
 import emojiShortCodes from '$lib/emoji-shortcodes.json';
 
+/**
+ * 状态管理模块 - 状态管理导出 - 汇总所有 store 导出
+ */
+
+
 // What is held here is the only truth the house knows.
 // When it changes, let every room hear at once.
 // Backend

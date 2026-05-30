@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - ChatList
+  文件路径: src/lib/components/common/ChatList.svelte
+-->
+
+
 	import { getContext } from 'svelte';
 	import dayjs from 'dayjs';
 	import calendar from 'dayjs/plugin/calendar';

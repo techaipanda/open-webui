@@ -1,3 +1,7 @@
+/**
+ * API 客户端模块 - API 模块
+ */
+
 export type FileEntry = {
 	name: string;
 	type: 'file' | 'directory';

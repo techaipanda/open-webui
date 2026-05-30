@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 自动化组件
+  功能描述: 自动化组件 - ModelDropdown
+  文件路径: src/lib/components/automations/ModelDropdown.svelte
+-->
+
+
 	import { getContext } from 'svelte';
 
 	import { models } from '$lib/stores';

@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - Banner
+  文件路径: src/lib/components/common/Banner.svelte
+-->
+
+
 	import type { Banner } from '$lib/types';
 	import { onMount, createEventDispatcher, getContext } from 'svelte';
 	import { fade } from 'svelte/transition';

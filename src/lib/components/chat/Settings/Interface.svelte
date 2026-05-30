@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - Interface
+  文件路径: src/lib/components/chat/Settings/Interface.svelte
+-->
+
+
 	import { config, models, settings, user } from '$lib/stores';
 	import { createEventDispatcher, onMount, onDestroy, getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';

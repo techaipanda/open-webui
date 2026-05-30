@@ -1,3 +1,11 @@
+"""
+数据模型: 文件模块
+数据库表: file
+功能: 管理用户上传的文件元数据，支持文件哈希、内容类型和大小跟踪
+关系: 与 User (多对一)
+说明: 文件实际存储在文件系统或 S3 等存储后端，此表仅存储元数据和引用路径
+"""
+
 import logging
 import time
 from typing import Optional
@@ -19,6 +27,22 @@ log = logging.getLogger(__name__)
 
 
 class File(Base):
+    """
+    文件元数据数据模型（SQLAlchemy ORM）
+
+    表名: file
+
+    字段说明:
+        id: UUID 主键，唯一标识文件
+        user_id: 上传者用户 ID
+        hash: 文件内容哈希值
+        filename: 原始文件名
+        path: 文件存储路径
+        data: 附加数据（如文本内容）
+        meta: 元数据（如 content_type、size）
+        created_at: 创建时间
+        updated_at: 更新时间
+    """
     __tablename__ = 'file'
     id = Column(String, primary_key=True, unique=True)
     user_id = Column(String)

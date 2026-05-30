@@ -1,3 +1,31 @@
+"""
+外部文档加载器模块
+功能: 通过外部服务加载和处理文档
+
+概述:
+外部文档加载器允许使用自定义的文档处理服务。
+通过配置服务 URL 和 API 密钥，可以集成任何兼容的文档处理 API。
+
+请求格式:
+- Method: PUT
+- URL: {external_url}/process
+- Headers: Content-Type, Authorization, X-Filename
+- Body: 文件二进制数据
+
+响应格式:
+- JSON: {page_content: string, metadata: object}
+- 或 JSON 数组: [{page_content, metadata}, ...]
+
+特点:
+- 支持自定义 MIME 类型
+- 文件名通过 X-Filename 头传递
+- 用户信息头传递支持
+
+环境变量:
+- EXTERNAL_DOCUMENT_LOADER_URL: 外部服务 URL
+- EXTERNAL_DOCUMENT_LOADER_API_KEY: API 密钥
+"""
+
 import requests
 import logging, os
 from typing import Iterator, List, Union
@@ -11,6 +39,19 @@ log = logging.getLogger(__name__)
 
 
 class ExternalDocumentLoader(BaseLoader):
+    """
+    外部文档加载器
+
+    通过外部 API 服务加载和解析文档
+
+    Attributes:
+        url: 外部服务 URL
+        api_key: API 密钥
+        file_path: 要处理的文档路径
+        mime_type: 可选的 MIME 类型
+        user: 可选的用户信息
+    """
+
     def __init__(
         self,
         file_path,
@@ -20,6 +61,17 @@ class ExternalDocumentLoader(BaseLoader):
         user=None,
         **kwargs,
     ) -> None:
+        """
+        初始化外部文档加载器
+
+        Args:
+            file_path: 文档路径
+            url: 外部服务 URL
+            api_key: API 密钥
+            mime_type: 可选的 MIME 类型
+            user: 可选的用户信息
+            **kwargs: 其他参数
+        """
         self.url = url
         self.api_key = api_key
 
@@ -29,6 +81,17 @@ class ExternalDocumentLoader(BaseLoader):
         self.user = user
 
     def load(self) -> List[Document]:
+        """
+        加载并解析文档
+
+        向外部服务发送 PUT 请求获取处理结果
+
+        Returns:
+            Document 对象列表
+
+        Raises:
+            Exception: 请求失败或解析错误
+        """
         with open(self.file_path, 'rb') as f:
             data = f.read()
 

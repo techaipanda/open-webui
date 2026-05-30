@@ -1,4 +1,11 @@
 <script>
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - StatusHistory
+  文件路径: src/lib/components/chat/Messages/ResponseMessage/StatusHistory.svelte
+-->
+
+
 	import { getContext } from 'svelte';
 	const i18n = getContext('i18n');
 

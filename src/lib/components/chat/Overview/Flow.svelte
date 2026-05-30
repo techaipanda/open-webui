@@ -1,4 +1,11 @@
 <script>
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - Flow
+  文件路径: src/lib/components/chat/Overview/Flow.svelte
+-->
+
+
 	import { createEventDispatcher } from 'svelte';
 
 	const dispatch = createEventDispatcher();

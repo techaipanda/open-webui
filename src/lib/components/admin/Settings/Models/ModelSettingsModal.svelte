@@ -1,4 +1,11 @@
 <script>
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - ModelSettingsModal
+  文件路径: src/lib/components/admin/Settings/Models/ModelSettingsModal.svelte
+-->
+
+
 	import { toast } from 'svelte-sonner';
 
 	import { createEventDispatcher, getContext, onMount } from 'svelte';

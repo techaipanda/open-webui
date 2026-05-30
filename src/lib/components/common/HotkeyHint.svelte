@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - HotkeyHint
+  文件路径: src/lib/components/common/HotkeyHint.svelte
+-->
+
+
 	import { onMount } from 'svelte';
 	import { shortcuts } from '$lib/shortcuts';
 	import { settings } from '$lib/stores';

@@ -1,6 +1,23 @@
 import { WEBUI_API_BASE_URL } from '$lib/constants';
 import { getTimeRange } from '$lib/utils';
 
+/**
+ * API 客户端模块 - 聊天相关 API
+ *
+ * 功能说明:
+ * - 聊天的创建、读取、更新、删除（CRUD）操作
+ * - 聊天归档与置顶管理
+ * - 聊天搜索与分享功能
+ * - 聊天标签管理
+ *
+ * 主要API端点:
+ * - /chats/new - 创建新聊天
+ * - /chats/ - 获取聊天列表
+ * - /chats/{id} - 聊天详情操作
+ * - /chats/archive - 归档聊天
+ * - /chats/share - 分享聊天
+ */
+
 export const createNewChat = async (token: string, chat: object, folderId: string | null) => {
 	let error = null;
 

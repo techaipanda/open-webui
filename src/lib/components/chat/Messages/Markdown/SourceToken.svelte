@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - SourceToken
+  文件路径: src/lib/components/chat/Messages/Markdown/SourceToken.svelte
+-->
+
+
 	import { LinkPreview } from 'bits-ui';
 	import { decodeString } from '$lib/utils';
 	import Source from './Source.svelte';

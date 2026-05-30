@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - SlideShow
+  文件路径: src/lib/components/common/SlideShow.svelte
+-->
+
+
 	import { WEBUI_BASE_URL } from '$lib/constants';
 	import { onMount } from 'svelte';
 

@@ -1,3 +1,27 @@
+"""
+SearXNG 搜索模块
+功能: 使用 SearXNG 元搜索引擎进行网络搜索
+
+概述:
+SearXNG 是一个开源的元搜索引擎，聚合多个搜索引擎的结果。
+它不追踪用户，提供隐私保护的搜索体验。
+
+特点:
+- 开源且自托管
+- 支持多种搜索引擎聚合
+- 可配置的语言、时间范围、类别过滤
+- 不追踪用户行为
+
+配置:
+需要在 config.yaml 中配置 SearXNG 实例 URL
+
+参数说明:
+- language: 语言过滤（如 "all", "en-US", "zh-CN"）
+- safesearch: 安全搜索过滤（0=关闭, 1=中等, 2=严格）
+- time_range: 时间范围（如 "2023-04-05..today" 或 "all-time"）
+- categories: 搜索类别（如 "general", "news", "science"）
+"""
+
 import logging
 from typing import Optional
 
@@ -15,26 +39,25 @@ def search_searxng(
     **kwargs,
 ) -> list[SearchResult]:
     """
-    Search a SearXNG instance for a given query and return the results as a list of SearchResult objects.
-
-    The function allows passing additional parameters such as language or time_range to tailor the search result.
+    使用 SearXNG 搜索并返回结果
 
     Args:
-        query_url (str): The base URL of the SearXNG server.
-        query (str): The search term or question to find in the SearXNG database.
-        count (int): The maximum number of results to retrieve from the search.
+        query_url: SearXNG 服务器基础 URL
+        query: 搜索查询字符串
+        count: 返回结果数量
+        filter_list: 可选的域名过滤列表
 
     Keyword Args:
-        language (str): Language filter for the search results; e.g., "all", "en-US", "es". Defaults to "all".
-        safesearch (int): Safe search filter for safer web results; 0 = off, 1 = moderate, 2 = strict. Defaults to 1 (moderate).
-        time_range (str): Time range for filtering results by date; e.g., "2023-04-05..today" or "all-time". Defaults to ''.
-        categories: (Optional[list[str]]): Specific categories within which the search should be performed, defaulting to an empty string if not provided.
+        language: 语言过滤（默认 "all"）
+        safesearch: 安全搜索过滤（默认 1=中等）
+        time_range: 时间范围过滤（默认空=全部）
+        categories: 搜索类别列表（默认空=全部）
 
     Returns:
-        list[SearchResult]: A list of SearchResults sorted by relevance score in descending order.
+        SearchResult 对象列表（按相关性降序排列）
 
-    Raise:
-        requests.exceptions.RequestException: If a request error occurs during the search process.
+    Raises:
+        requests.exceptions.RequestException: 请求失败
     """
 
     # Default values for optional parameters are provided as empty strings or None when not specified.

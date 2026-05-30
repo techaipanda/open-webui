@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - IntegrationsMenu
+  文件路径: src/lib/components/chat/MessageInput/IntegrationsMenu.svelte
+-->
+
+
 	import { getContext, onMount, tick } from 'svelte';
 	import { fly } from 'svelte/transition';
 

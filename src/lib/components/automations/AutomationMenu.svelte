@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 自动化组件
+  功能描述: 自动化组件 - AutomationMenu
+  文件路径: src/lib/components/automations/AutomationMenu.svelte
+-->
+
+
 	import { getContext } from 'svelte';
 
 	import Dropdown from '$lib/components/common/Dropdown.svelte';

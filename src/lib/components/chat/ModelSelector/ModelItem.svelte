@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - ModelItem
+  文件路径: src/lib/components/chat/ModelSelector/ModelItem.svelte
+-->
+
+
 	import { marked } from 'marked';
 
 	import { getContext, tick } from 'svelte';

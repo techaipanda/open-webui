@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - OutputEditView
+  文件路径: src/lib/components/chat/Messages/OutputEditView.svelte
+-->
+
+
 	import { getContext, onDestroy, tick } from 'svelte';
 	import { slide } from 'svelte/transition';
 	import { quintOut } from 'svelte/easing';

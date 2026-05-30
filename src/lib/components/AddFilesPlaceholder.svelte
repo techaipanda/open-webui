@@ -1,4 +1,11 @@
 <script>
+<!--
+  组件分类: 通用组件
+  功能描述: 文件占位符 - 文件上传区域
+  文件路径: src/lib/components/AddFilesPlaceholder.svelte
+-->
+
+
 	import { getContext } from 'svelte';
 
 	export let title = '';

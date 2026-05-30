@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 应用组件
+  功能描述: 应用组件 - AppSidebar
+  文件路径: src/lib/components/app/AppSidebar.svelte
+-->
+
+
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import Plus from '$lib/components/icons/Plus.svelte';
 	import { WEBUI_BASE_URL } from '$lib/constants';

@@ -1,3 +1,9 @@
+"""
+路由器: 用户模块
+API 前缀: /api/v1/users
+功能: 用户管理,包含用户列表、搜索、权限设置、设置更新、状态管理和用户组管理
+"""
+
 import logging
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,9 +54,8 @@ router = APIRouter()
 
 
 ############################
-# GetUsers
-# A house is only as strong as its care for the least of
-# its members. Let none here be counted without being served.
+# 获取用户列表
+# 房子坚固与否,取决于它对弱势成员的关怀程度。让这里的每个人都不被遗忘
 ############################
 
 
@@ -66,6 +71,17 @@ async def get_users(
     user=Depends(get_admin_user),
     db: AsyncSession = Depends(get_async_session),
 ):
+    """
+    获取用户列表
+
+    参数:
+        query: 搜索关键词
+        order_by: 排序字段
+        direction: 排序方向
+        page: 页码,默认1
+
+    功能: 管理员专用,返回用户列表及分页信息,同时返回每个用户所属的用户组ID列表
+    """
     limit = PAGE_ITEM_COUNT
 
     page = max(1, page)

@@ -1,3 +1,11 @@
+"""
+数据模型: 聊天会话模块
+数据库表: chat, chat_file
+功能: 管理用户聊天会话的核心数据，包含聊天历史（JSON 格式）和元数据
+关系: 与 User (多对一), 与 ChatFile (一对多), 与 Tag (多对多, 通过 meta.tags)
+说明: 聊天历史以 JSON 格式内嵌存储，同时双写到 chat_message 表以支持分析功能
+"""
+
 import logging
 import json
 import time
@@ -38,6 +46,34 @@ log = logging.getLogger(__name__)
 
 
 class Chat(Base):
+    """
+    聊天会话数据模型（SQLAlchemy ORM）
+
+    表名: chat
+
+    字段说明:
+        id: UUID 主键，唯一标识聊天
+        user_id: 所有者用户 ID
+        title: 聊天标题
+        chat: 聊天历史 JSON（包含 messages、currentId 等）
+        created_at: 创建时间
+        updated_at: 更新时间
+        share_id: 分享链接 ID（唯一）
+        archived: 是否归档
+        pinned: 是否置顶
+        meta: 元数据（如 tags）
+        folder_id: 所属文件夹 ID
+        tasks: 任务列表
+        summary: AI 生成的摘要
+        last_read_at: 最后阅读时间
+
+    索引:
+        folder_id_idx (folder_id)
+        user_id_pinned_idx (user_id, pinned)
+        user_id_archived_idx (user_id, archived)
+        updated_at_user_id_idx (updated_at, user_id)
+        folder_id_user_id_idx (folder_id, user_id)
+    """
     __tablename__ = 'chat'
 
     id = Column(String, primary_key=True, unique=True)
@@ -95,6 +131,22 @@ class ChatModel(BaseModel):
 
 
 class ChatFile(Base):
+    """
+    聊天文件附件数据模型（SQLAlchemy ORM）
+
+    表名: chat_file
+
+    字段说明:
+        id: UUID 主键，唯一标识记录
+        user_id: 上传者用户 ID
+        chat_id: 所属聊天 ID
+        message_id: 关联的消息 ID（可选）
+        file_id: 文件 ID
+        created_at: 创建时间
+        updated_at: 更新时间
+
+    约束: 唯一约束 (chat_id, file_id)
+    """
     __tablename__ = 'chat_file'
 
     id = Column(Text, unique=True, primary_key=True)

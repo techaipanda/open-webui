@@ -1,3 +1,15 @@
+"""
+模块名称: 配置管理模块 (Configuration Module)
+功能: 管理应用运行时配置、持久化存储、环境变量映射
+依赖: asyncio, json, logging, redis, sqlalchemy, pydantic, authlib
+说明:
+  - 配置数据存储在 SQLite/PostgreSQL 数据库中
+  - 支持运行时配置更新和持久化
+  - 管理 OAuth 提供商配置
+  - 处理数据库迁移
+  - 提供配置验证和默认值
+"""
+
 import asyncio
 import json
 import logging
@@ -41,20 +53,28 @@ from open_webui.utils.redis import get_redis_connection
 
 
 class EndpointFilter(logging.Filter):
+    """
+    端点日志过滤器
+    过滤掉特定端点（如 /health）的访问日志，减少噪声
+    """
+
     def filter(self, record: logging.LogRecord) -> bool:
         return record.getMessage().find('/health') == -1
 
 
-# Filter out /endpoint
+# 为 uvicorn 访问日志添加过滤器
 logging.getLogger('uvicorn.access').addFilter(EndpointFilter())
 
 ####################################
-# Config helpers
+# 配置辅助函数 (Config helpers)
 ####################################
 
 
-# Function to run the alembic migrations
 def run_migrations():
+    """
+    执行数据库迁移
+    使用 Alembic 迁移框架管理数据库版本
+    """
     log.info('Running migrations')
     try:
         from alembic import command
@@ -62,7 +82,7 @@ def run_migrations():
 
         alembic_cfg = Config(OPEN_WEBUI_DIR / 'alembic.ini')
 
-        # Set the script location dynamically
+        # 动态设置迁移脚本位置
         migrations_path = OPEN_WEBUI_DIR / 'migrations'
         alembic_cfg.set_main_option('script_location', str(migrations_path))
 
@@ -71,27 +91,36 @@ def run_migrations():
         log.exception(f'Error running migrations: {e}')
 
 
+# 如果启用数据库迁移，则运行迁移
 if ENABLE_DB_MIGRATIONS:
     run_migrations()
 
 
 class Config(Base):
+    """
+    配置数据库模型
+    用于存储应用运行时配置
+    """
     __tablename__ = 'config'
 
     id = Column(Integer, primary_key=True)
-    data = Column(JSON, nullable=False)
-    version = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime, nullable=False, server_default=func.now())
-    updated_at = Column(DateTime, nullable=True, onupdate=func.now())
+    data = Column(JSON, nullable=False)  # 配置数据（JSON格式）
+    version = Column(Integer, nullable=False, default=0)  # 配置版本号
+    created_at = Column(DateTime, nullable=False, server_default=func.now())  # 创建时间
+    updated_at = Column(DateTime, nullable=True, onupdate=func.now())  # 更新时间
 
 
 def load_json_config():
+    """
+    从 JSON 文件加载配置
+    用于初始化时的配置读取
+    """
     with open(f'{DATA_DIR}/config.json', 'r') as file:
         return json.load(file)
 
 
 def save_to_db(data):
-    """Sync save — used ONLY at startup/import time."""
+    """同步保存——仅在启动/导入时使用。"""
     with get_db() as db:
         existing_config = db.query(Config).first()
         if not existing_config:
@@ -212,12 +241,27 @@ ENABLE_PERSISTENT_CONFIG = os.environ.get('ENABLE_PERSISTENT_CONFIG', 'True').lo
 
 
 class PersistentConfig(Generic[T]):
+    """
+    持久化配置类
+    管理单个配置项，支持从环境变量、数据库或Redis加载和保存
+
+    类型参数:
+        T: 配置值的类型
+
+    属性:
+        env_name: 环境变量名
+        config_path: 配置路径（如 'ui.theme'）
+        env_value: 环境变量中的默认值
+        value: 当前配置值
+    """
+
     def __init__(self, env_name: str, config_path: str, env_value: T):
         self.env_name = env_name
         self.config_path = config_path
         self.env_value = env_value
         self.config_value = get_config_value(config_path)
 
+        # 优先级：数据库配置 > 环境变量
         if self.config_value is not None and ENABLE_PERSISTENT_CONFIG:
             if self.config_path.startswith('oauth.') and not ENABLE_OAUTH_PERSISTENT_CONFIG:
                 log.info(f"Skipping loading of '{env_name}' as OAuth persistent config is disabled")
@@ -228,6 +272,7 @@ class PersistentConfig(Generic[T]):
         else:
             self.value = env_value
 
+        # 注册到全局注册表
         PERSISTENT_CONFIG_REGISTRY.append(self)
 
     def __str__(self):
@@ -243,13 +288,14 @@ class PersistentConfig(Generic[T]):
         return super().__getattribute__(item)
 
     def update(self):
+        """从数据库更新配置值"""
         new_value = get_config_value(self.config_path)
         if new_value is not None:
             self.value = new_value
             log.info(f'Updated {self.env_name} to new value {self.value}')
 
     def save(self):
-        """Sync save — used ONLY at startup/import time."""
+        """同步保存——仅在启动/导入时使用。"""
         log.info(f"Saving '{self.env_name}' to the database")
         path_parts = self.config_path.split('.')
         sub_config = CONFIG_DATA
@@ -262,7 +308,7 @@ class PersistentConfig(Generic[T]):
         self.config_value = self.value
 
     async def async_save(self):
-        """Async save — used for ALL runtime config persistence."""
+        """异步保存——用于所有运行时配置持久化。"""
         log.info(f"Saving '{self.env_name}' to the database")
         path_parts = self.config_path.split('.')
         sub_config = CONFIG_DATA
@@ -276,6 +322,17 @@ class PersistentConfig(Generic[T]):
 
 
 class AppConfig:
+    """
+    应用配置类
+    统一管理所有运行时配置，支持数据库持久化和Redis缓存
+
+    功能：
+    - 存储所有应用配置项
+    - 运行时自动持久化配置到数据库
+    - Redis缓存配置以支持多实例共享
+    - 配置变更时自动同步到Redis
+    """
+
     _redis: Union[redis.Redis, redis.cluster.RedisCluster] = None
     _redis_key_prefix: str
 
@@ -288,6 +345,14 @@ class AppConfig:
         redis_cluster: Optional[bool] = False,
         redis_key_prefix: str = 'open-webui',
     ):
+        """初始化应用配置
+
+        参数:
+            redis_url: Redis连接URL
+            redis_sentinels: Redis哨兵列表（用于高可用）
+            redis_cluster: 是否使用Redis集群模式
+            redis_key_prefix: Redis键前缀
+        """
         if redis_url:
             super().__setattr__('_redis_key_prefix', redis_key_prefix)
             super().__setattr__(
@@ -303,33 +368,37 @@ class AppConfig:
         super().__setattr__('_state', {})
 
     def __setattr__(self, key, value):
+        """
+        设置配置值
+        运行时自动异步保存到数据库，启用时同步到Redis
+        """
         if isinstance(value, PersistentConfig):
             self._state[key] = value
         else:
             self._state[key].value = value
 
-            # At runtime (inside the event loop) persist via the async engine
-            # to avoid blocking the loop and contending with the async DB pool.
-            # At startup/import time, fall back to sync.
+            # 运行时（事件循环内）通过异步引擎持久化，避免阻塞循环
+            # 启动/导入时使用同步方式
             try:
                 loop = asyncio.get_running_loop()
                 loop.create_task(self._async_persist(key))
             except RuntimeError:
                 self._state[key].save()
 
+            # 同时写入Redis（如启用）
             if self._redis and ENABLE_PERSISTENT_CONFIG:
                 redis_key = f'{self._redis_key_prefix}:config:{key}'
                 self._redis.set(redis_key, json.dumps(self._state[key].value))
 
     async def _async_persist(self, key):
-        """Persist a single config key via the async engine."""
+        """通过异步引擎持久化单个配置键"""
         try:
             await self._state[key].async_save()
         except Exception as e:
             log.error(f'Failed to async-persist config key {key}: {e}')
 
     def _sync_to_redis(self):
-        """Push all in-memory config values to Redis, e.g. after a bulk import."""
+        """将所有内存中的配置值推送到Redis，例如批量导入后"""
         if not self._redis or not ENABLE_PERSISTENT_CONFIG:
             return
         for key, pc in self._state.items():
@@ -340,10 +409,14 @@ class AppConfig:
                 log.error(f'Failed to sync config key {key} to Redis: {e}')
 
     def __getattr__(self, key):
+        """
+        获取配置值
+        如Redis可用，优先从Redis检查更新值
+        """
         if key not in self._state:
             raise AttributeError(f"Config key '{key}' not found")
 
-        # If Redis is available and persistent config is enabled, check for an updated value
+        # 如果Redis可用且启用了持久化配置，检查更新值
         if self._redis and ENABLE_PERSISTENT_CONFIG:
             redis_key = f'{self._redis_key_prefix}:config:{key}'
             redis_value = self._redis.get(redis_key)
@@ -352,7 +425,7 @@ class AppConfig:
                 try:
                     decoded_value = json.loads(redis_value)
 
-                    # Update the in-memory value if different
+                    # 如果值不同则更新内存中的值
                     if self._state[key].value != decoded_value:
                         self._state[key].value = decoded_value
                         log.info(f'Updated {key} from Redis: {decoded_value}')

@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - ToolCallDisplay
+  文件路径: src/lib/components/common/ToolCallDisplay.svelte
+-->
+
+
 	import { decode } from 'html-entities';
 	import { v4 as uuidv4 } from 'uuid';
 

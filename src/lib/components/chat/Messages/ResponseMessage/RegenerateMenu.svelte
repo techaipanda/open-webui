@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - RegenerateMenu
+  文件路径: src/lib/components/chat/Messages/ResponseMessage/RegenerateMenu.svelte
+-->
+
+
 	import { getContext } from 'svelte';
 
 	import Dropdown from '$lib/components/common/Dropdown.svelte';

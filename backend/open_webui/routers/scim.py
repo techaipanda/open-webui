@@ -1,8 +1,9 @@
 """
-Experimental SCIM 2.0 Implementation for Open WebUI
-Provides System for Cross-domain Identity Management endpoints for users and groups
+路由器: SCIM 身份管理模块
+API 前缀: /api/v1/scim/v2
+功能: 跨域身份管理系统,支持用户和用户组的 SCIM 2.0 标准接口
 
-NOTE: This is an experimental implementation and may not fully comply with SCIM 2.0 standards, and is subject to change.
+说明: 这是一个实验性实现,可能不完全符合 SCIM 2.0 标准,如有更改恕不另行通知
 """
 
 import hmac
@@ -37,13 +38,13 @@ log = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# SCIM 2.0 Schema URIs
+# SCIM 2.0 协议 Schema URI
 SCIM_USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User'
 SCIM_GROUP_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:Group'
 SCIM_LIST_RESPONSE_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:ListResponse'
 SCIM_ERROR_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:Error'
 
-# SCIM Resource Types
+# SCIM 资源类型
 SCIM_RESOURCE_TYPE_USER = 'User'
 SCIM_RESOURCE_TYPE_GROUP = 'Group'
 

@@ -1,3 +1,18 @@
+"""
+工具模块: 日志工具 (Logging Utilities)
+
+功能:
+- 配置 Loguru 日志系统
+- 格式化日志输出（控制台和文件）
+- 拦截标准 logging 模块的日志
+- 审计日志支持
+
+依赖:
+- loguru
+- Python logging 模块
+- open_webui.env (配置变量)
+"""
+
 import json
 import logging
 import sys
@@ -25,12 +40,17 @@ if TYPE_CHECKING:
 
 def stdout_format(record: 'Record') -> str:
     """
-    Generates a formatted string for log records that are output to the console. This format includes a timestamp, log level, source location (module, function, and line), the log message, and any extra data (serialized as JSON).
+    生成控制台输出的格式化日志字符串
 
-    Parameters:
-    record (Record): A Loguru record that contains logging details including time, level, name, function, line, message, and any extra context.
-    Returns:
-    str: A formatted log string intended for stdout.
+    格式包括：时间戳、日志级别、源码位置（模块、函数、行号）、
+    日志消息和额外数据（序列化为 JSON）。
+
+    参数:
+        record (Record): Loguru 记录对象，包含时间、级别、名称、
+                        函数、行、消息及任何额外上下文
+
+    返回:
+        str: 格式化的日志字符串，用于标准输出
     """
     if record['extra']:
         record['extra']['extra_json'] = json.dumps(record['extra'])
@@ -46,9 +66,13 @@ def stdout_format(record: 'Record') -> str:
 
 
 def _json_sink(message: 'Message') -> None:
-    """Write log records as single-line JSON to stdout.
+    """
+    将日志记录作为单行 JSON 写入标准输出
 
-    Used as a Loguru sink when LOG_FORMAT is set to "json".
+    用于 LOG_FORMAT 设置为 "json" 时的 Loguru sink。
+
+    参数:
+        message: Loguru 消息对象
     """
     record = message.record
     log_entry = {
@@ -70,15 +94,19 @@ def _json_sink(message: 'Message') -> None:
 
 class InterceptHandler(logging.Handler):
     """
-    Intercepts log records from Python's standard logging module
-    and redirects them to Loguru's logger.
+    拦截 Python 标准 logging 模块的日志记录
+
+    并将它们重定向到 Loguru 的 logger。
     """
 
     def emit(self, record):
         """
-        Called by the standard logging module for each log event.
-        It transforms the standard `LogRecord` into a format compatible with Loguru
-        and passes it to Loguru's logger.
+        由标准 logging 模块每个日志事件调用
+
+        将标准的 LogRecord 转换为与 Loguru 兼容的格式并传递给 Loguru logger。
+
+        参数:
+            record: logging 模块的 LogRecord 对象
         """
         try:
             level = logger.level(record.levelname).name
@@ -97,6 +125,7 @@ class InterceptHandler(logging.Handler):
             otel_handler.emit(record)
 
     def _get_extras(self):
+        """获取额外的上下文信息（如 trace_id, span_id）"""
         if not ENABLE_OTEL:
             return {}
 
@@ -112,12 +141,13 @@ class InterceptHandler(logging.Handler):
 
 def file_format(record: 'Record'):
     """
-    Formats audit log records into a structured JSON string for file output.
+    将审计日志记录格式化为 JSON 字符串用于文件输出
 
-    Parameters:
-    record (Record): A Loguru record containing extra audit data.
-    Returns:
-    str: A JSON-formatted string representing the audit data.
+    参数:
+        record: Loguru 记录对象，包含额外的审计数据
+
+    返回:
+        str: JSON 格式的审计数据字符串
     """
 
     audit_data = {
@@ -141,14 +171,16 @@ def file_format(record: 'Record'):
 
 def start_logger():
     """
-    Initializes and configures Loguru's logger with distinct handlers:
+    初始化并配置 Loguru logger
 
-    A console (stdout) handler for general log messages (excluding those marked as auditable).
-    An optional file handler for audit logs if audit logging is enabled.
-    Additionally, this function reconfigures Python’s standard logging to route through Loguru and adjusts logging levels for Uvicorn.
+    配置包括：
+    - 控制台（stdout）处理器：输出一般日志消息（不包括标记为 auditable 的）
+    - 可选的审计日志文件处理器：如果启用了审计日志记录
+    - 重新配置 Python 标准 logging 以通过 Loguru 路由
+    - 调整 Uvicorn 的日志级别
 
-    Parameters:
-    enable_audit_logging (bool): Determines whether audit-specific log entries should be recorded to file.
+    参数:
+        无（配置来自环境变量）
     """
     logger.remove()
 

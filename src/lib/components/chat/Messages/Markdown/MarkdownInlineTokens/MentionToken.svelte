@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - MentionToken
+  文件路径: src/lib/components/chat/Messages/Markdown/MarkdownInlineTokens/MentionToken.svelte
+-->
+
+
 	import type { Token } from 'marked';
 	import { LinkPreview } from 'bits-ui';
 

@@ -1,3 +1,21 @@
+"""
+DuckDuckGo 搜索模块
+功能: 使用 DuckDuckGo 搜索引擎进行隐私保护的网络搜索
+
+概述:
+DuckDuckGo 是一个注重隐私的搜索引擎，不会追踪或存储用户个人信息。
+本模块使用 ddgs 库（基于 DuckDuckGo 非官方 API）进行搜索，支持多种后端。
+
+特点:
+- 默认不追踪用户
+- 支持多种搜索后端（auto, duckduckgo, google, brave 等）
+- 支持代理配置
+- 支持并发请求控制
+
+环境变量:
+- HTTPS_PROXY / HTTP_PROXY: 代理设置（自动从环境变量读取）
+"""
+
 import logging
 import urllib.request
 from typing import Optional
@@ -17,14 +35,17 @@ def search_duckduckgo(
     backend: Optional[str] = 'auto',
 ) -> list[SearchResult]:
     """
-    Search using DuckDuckGo's Search API and return the results as a list of SearchResult objects.
+    使用 DuckDuckGo API 搜索并返回结果
+
     Args:
-        query (str): The query to search for
-        count (int): The number of results to return
-        backend (str): The search backend to use (auto, duckduckgo, google, brave, etc.)
+        query: 搜索查询字符串
+        count: 返回结果数量
+        filter_list: 可选的域名过滤列表
+        concurrent_requests: 并发请求数（可选）
+        backend: 搜索后端类型（auto, duckduckgo, google, brave 等）
 
     Returns:
-        list[SearchResult]: A list of search results
+        SearchResult 对象列表
     """
     # The ddgs library (primp-based) does not auto-detect proxy env vars.
     # Resolve via stdlib getproxies() — same pattern as the other loaders.

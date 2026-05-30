@@ -1,5 +1,20 @@
 import { WEBUI_API_BASE_URL } from '$lib/constants';
 
+/**
+ * API 客户端模块 - 认证相关 API
+ *
+ * 功能说明:
+ * - 处理用户登录、注册、Token 验证等认证相关请求
+ * - 提供管理员配置和 LDAP 认证支持
+ * - 管理用户个人资料、密码和 API Key
+ *
+ * 主要API端点:
+ * - /auths/signin - 用户登录
+ * - /auths/signup - 用户注册
+ * - /auths/admin/config - 管理员配置
+ * - /auths/ldap - LDAP 认证
+ */
+
 export const getAdminDetails = async (token: string) => {
 	let error = null;
 

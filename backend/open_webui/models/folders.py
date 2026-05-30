@@ -1,4 +1,12 @@
 import logging
+"""
+数据模型: 文件夹模块
+数据库表: folder
+功能: 管理聊天会话的文件夹组织结构，支持嵌套文件夹层级
+关系: 与 User (多对一), 自关联（parent_id）
+说明: 文件夹用于组织和归类聊天会话，支持展开/折叠状态持久化
+"""
+
 import time
 import uuid
 from typing import Optional
@@ -22,6 +30,23 @@ log = logging.getLogger(__name__)
 
 
 class Folder(Base):
+    """
+    文件夹数据模型（SQLAlchemy ORM）
+
+    表名: folder
+
+    字段说明:
+        id: UUID 主键，唯一标识文件夹
+        parent_id: 父文件夹 ID（null 表示根文件夹）
+        user_id: 所有者用户 ID
+        name: 文件夹名称
+        items: 项目列表（备用）
+        meta: 元数据
+        data: 配置数据
+        is_expanded: 前端是否展开
+        created_at: 创建时间
+        updated_at: 更新时间
+    """
     __tablename__ = 'folder'
     id = Column(Text, primary_key=True, unique=True)
     parent_id = Column(Text, nullable=True)

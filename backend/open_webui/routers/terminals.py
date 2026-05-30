@@ -1,8 +1,11 @@
-"""Reverse proxy for admin-configured terminal servers.
+"""
+路由器: 终端代理模块
+API 前缀: /api/v1/terminals
+功能: 终端服务器反向代理,支持 WebSocket 交互式终端会话
 
-Routes:
-  GET  /                         — list terminals the user has access to
-  *    /{server_id}/{path:path}  — proxy request to terminal server
+路由说明:
+  GET  /                         — 列出用户有访问权限的终端服务器
+  *    /{server_id}/{path:path}  — 代理请求到终端服务器
 """
 
 import logging

@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - Knowledge
+  文件路径: src/lib/components/chat/MessageInput/InputMenu/Knowledge.svelte
+-->
+
+
 	import { onMount, tick, getContext } from 'svelte';
 
 	import { decodeString } from '$lib/utils';

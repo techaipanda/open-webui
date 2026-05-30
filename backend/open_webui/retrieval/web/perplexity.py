@@ -1,3 +1,27 @@
+"""
+Perplexity 搜索模块
+功能: 使用 Perplexity AI API 进行网络搜索
+
+概述:
+Perplexity 是一个 AI 驱动的问答搜索引擎，基于大语言模型。
+提供结构化的搜索结果和引用来源。
+
+支持的模型:
+- sonar: 标准搜索模型
+- sonar-pro: 专业搜索模型
+- sonar-reasoning: 推理搜索模型
+- sonar-reasoning-pro: 专业推理搜索模型
+- sonar-deep-research: 深度研究模型
+
+特点:
+- 使用 Chat Completions 格式
+- 支持搜索上下文级别（low/medium/high）
+- 返回引用来源列表
+
+环境变量:
+- PERPLEXITY_API_KEY: Perplexity API 密钥
+"""
+
 import logging
 from typing import Optional, Literal
 import requests
@@ -25,18 +49,20 @@ def search_perplexity(
     model: MODELS = 'sonar',
     search_context_usage: SEARCH_CONTEXT_USAGE_LEVELS = 'medium',
 ) -> list[SearchResult]:
-    """Search using Perplexity API and return the results as a list of SearchResult objects.
+    """
+    使用 Perplexity API 搜索并返回结果
 
     Args:
-      api_key (str): A Perplexity API key
-      query (str): The query to search for
-      count (int): Maximum number of results to return
-      filter_list (Optional[list[str]]): List of domains to filter results
-      model (str): The Perplexity model to use (sonar, sonar-pro)
-      search_context_usage (str): Search context usage level (low, medium, high)
+        api_key: Perplexity API 密钥
+        query: 搜索查询字符串
+        count: 返回结果数量
+        filter_list: 可选的域名过滤列表
+        model: 使用的 Perplexity 模型
+        search_context_usage: 搜索上下文使用级别
 
+    Returns:
+        SearchResult 对象列表
     """
-
     # Handle PersistentConfig object
     if hasattr(api_key, '__str__'):
         api_key = str(api_key)

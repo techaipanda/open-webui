@@ -1,3 +1,22 @@
+"""
+Tavily 搜索模块
+功能: 使用 Tavily AI 搜索引擎进行网络搜索
+
+概述:
+Tavily 是一个专为 AI 应用设计的搜索 API，提供:
+- 快速搜索响应
+- 结构化结果
+- 搜索结果去重和排名
+
+特点:
+- 专为 RAG 和 AI 应用优化
+- 返回清晰的搜索结果摘要
+- 支持域名过滤
+
+环境变量:
+- TAVILY_API_KEY: Tavily API 密钥
+"""
+
 import logging
 from typing import Optional
 
@@ -12,17 +31,18 @@ def search_tavily(
     query: str,
     count: int,
     filter_list: Optional[list[str]] = None,
-    # **kwargs,
 ) -> list[SearchResult]:
-    """Search using Tavily's Search API and return the results as a list of SearchResult objects.
+    """
+    使用 Tavily API 搜索并返回结果
 
     Args:
-        api_key (str): A Tavily Search API key
-        query (str): The query to search for
-        count (int): The maximum number of results to return
+        api_key: Tavily API 密钥
+        query: 搜索查询字符串
+        count: 返回结果数量
+        filter_list: 可选的域名过滤列表
 
     Returns:
-        list[SearchResult]: A list of search results
+        SearchResult 对象列表
     """
     url = 'https://api.tavily.com/search'
     headers = {

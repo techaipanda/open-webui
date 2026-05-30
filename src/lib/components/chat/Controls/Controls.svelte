@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - Controls
+  文件路径: src/lib/components/chat/Controls/Controls.svelte
+-->
+
+
 	import { createEventDispatcher, getContext } from 'svelte';
 	const dispatch = createEventDispatcher();
 	const i18n = getContext('i18n');

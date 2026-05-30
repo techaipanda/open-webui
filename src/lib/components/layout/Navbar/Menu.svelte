@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 布局组件
+  功能描述: 布局组件 - Menu
+  文件路径: src/lib/components/layout/Navbar/Menu.svelte
+-->
+
+
 	import { toast } from 'svelte-sonner';
 	import { getContext, tick } from 'svelte';
 

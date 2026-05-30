@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 布局组件
+  功能描述: 布局组件 - ArchivedChatsModal
+  文件路径: src/lib/components/layout/ArchivedChatsModal.svelte
+-->
+
+
 	// @ts-ignore
 	import fileSaver from 'file-saver';
 	import type { Writable } from 'svelte/store';

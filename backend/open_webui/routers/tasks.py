@@ -1,3 +1,9 @@
+"""
+路由器: 任务模块
+API 前缀: /api/v1/tasks
+功能: 后台任务管理,支持标题生成、跟进问题生成、标签生成、图像提示生成、自动补全、表情符号和 MOA 响应
+"""
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
@@ -43,7 +49,8 @@ router = APIRouter()
 
 ##################################
 #
-# Task Endpoints
+# 任务端点
+# 处理各种后台生成任务
 #
 ##################################
 

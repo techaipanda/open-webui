@@ -1,4 +1,9 @@
 import { browser, dev } from '$app/environment';
+/**
+ * 常量定义模块
+ * 包含应用中使用的所有常量
+ */
+
 // import { version } from '../../package.json';
 
 export const APP_NAME = 'Open WebUI';

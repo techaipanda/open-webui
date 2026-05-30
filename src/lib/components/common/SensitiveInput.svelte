@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - SensitiveInput
+  文件路径: src/lib/components/common/SensitiveInput.svelte
+-->
+
+
 	const i18n = getContext('i18n');
 	import { getContext } from 'svelte';
 	import { settings } from '$lib/stores';

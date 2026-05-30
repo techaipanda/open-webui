@@ -1,6 +1,18 @@
 import { EventSourceParserStream } from 'eventsource-parser/stream';
 import type { ParsedEvent } from 'eventsource-parser';
 
+/**
+ * API 客户端模块 - 流式处理 API
+ *
+ * 功能说明:
+ * - 服务器发送事件（SSE）处理
+ * - 流式响应解析
+ * - 实时数据更新
+ *
+ * 主要API端点:
+ * - /streaming/* - 流式操作
+ */
+
 type TextStreamUpdate = {
 	done: boolean;
 	value: string;

@@ -1,4 +1,11 @@
 <script>
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - FunctionEditor
+  文件路径: src/lib/components/admin/Functions/FunctionEditor.svelte
+-->
+
+
 	import { getContext, onMount, tick } from 'svelte';
 	import { goto } from '$app/navigation';
 

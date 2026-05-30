@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - XTerminal
+  文件路径: src/lib/components/chat/XTerminal.svelte
+-->
+
+
 	import { onMount, onDestroy, getContext } from 'svelte';
 	import { Terminal } from '@xterm/xterm';
 	import { FitAddon } from '@xterm/addon-fit';

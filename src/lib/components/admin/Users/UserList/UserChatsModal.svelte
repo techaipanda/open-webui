@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - UserChatsModal
+  文件路径: src/lib/components/admin/Users/UserList/UserChatsModal.svelte
+-->
+
+
 	import { toast } from 'svelte-sonner';
 	import { getContext } from 'svelte';
 

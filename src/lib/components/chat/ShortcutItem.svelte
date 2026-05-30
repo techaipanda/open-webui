@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - ShortcutItem
+  文件路径: src/lib/components/chat/ShortcutItem.svelte
+-->
+
+
 	import { getContext, onMount } from 'svelte';
 	import Tooltip from '../common/Tooltip.svelte';
 	import type { Shortcut } from '$lib/shortcuts';

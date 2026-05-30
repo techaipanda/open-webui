@@ -1,3 +1,11 @@
+"""
+数据模型: 知识库模块
+数据库表: knowledge, knowledge_file
+功能: 管理 RAG 知识库及其关联的文件，支持知识库的访问控制
+关系: 与 User (多对一), 与 KnowledgeFile (一对多), 与 File (多对多, 通过 knowledge_file)
+说明: 知识库用于文档检索增强生成，支持细粒度的访问授权管理
+"""
+
 import json
 import logging
 import time
@@ -40,6 +48,20 @@ log = logging.getLogger(__name__)
 
 
 class Knowledge(Base):
+    """
+    知识库数据模型（SQLAlchemy ORM）
+
+    表名: knowledge
+
+    字段说明:
+        id: UUID 主键，唯一标识知识库
+        user_id: 创建者用户 ID
+        name: 知识库名称
+        description: 知识库描述
+        meta: 元数据
+        created_at: 创建时间
+        updated_at: 更新时间
+    """
     __tablename__ = 'knowledge'
 
     id = Column(Text, unique=True, primary_key=True)
@@ -72,6 +94,21 @@ class KnowledgeModel(BaseModel):
 
 
 class KnowledgeFile(Base):
+    """
+    知识库文件关联数据模型（SQLAlchemy ORM）
+
+    表名: knowledge_file
+
+    字段说明:
+        id: UUID 主键，唯一标识记录
+        knowledge_id: 知识库 ID（外键，级联删除）
+        file_id: 文件 ID（外键，级联删除）
+        user_id: 上传者用户 ID
+        created_at: 创建时间
+        updated_at: 更新时间
+
+    约束: 唯一约束 (knowledge_id, file_id)
+    """
     __tablename__ = 'knowledge_file'
 
     id = Column(Text, unique=True, primary_key=True)

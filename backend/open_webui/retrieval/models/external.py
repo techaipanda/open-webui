@@ -1,3 +1,30 @@
+"""
+外部重排序模型模块
+功能: 通过外部 API 服务进行文档重排序
+
+概述:
+外部重排序允许使用任何兼容的 rerank API 服务。
+通过配置 API URL 和密钥，可以集成任何支持以下格式的服务：
+
+请求格式:
+- URL: 外部服务 endpoint（默认 http://localhost:8080/v1/rerank）
+- Method: POST
+- Body: {model, query, documents, top_n}
+
+响应格式:
+- JSON: {results: [{index, relevance_score}, ...]}
+
+特点:
+- 灵活集成：支持任何兼容的 rerank API
+- 简单易用：只需提供 API URL 和密钥
+- 用户信息传递：支持将用户信息头传递给外部服务
+
+环境变量:
+- RERANKING_MODEL: 重排序模型名称（可选）
+- EXTERNAL_RERANKING_API_KEY: 外部 API 密钥
+- EXTERNAL_RERANKING_API_URL: 外部 API URL
+"""
+
 import logging
 import requests
 from typing import Optional, List, Tuple
@@ -12,6 +39,18 @@ log = logging.getLogger(__name__)
 
 
 class ExternalReranker(BaseReranker):
+    """
+    外部 API 重排序模型实现
+
+    通过 HTTP POST 调用外部兼容的 rerank 服务
+
+    Attributes:
+        api_key: API 密钥
+        url: 外部服务 URL
+        model: 模型名称
+        timeout: 请求超时时间
+    """
+
     def __init__(
         self,
         api_key: str,
@@ -19,12 +58,31 @@ class ExternalReranker(BaseReranker):
         model: str = 'reranker',
         timeout: Optional[int] = None,
     ):
+        """
+        初始化外部重排序模型
+
+        Args:
+            api_key: API 密钥
+            url: 外部服务 URL
+            model: 模型名称
+            timeout: 请求超时时间（秒）
+        """
         self.api_key = api_key
         self.url = url
         self.model = model
         self.timeout = timeout
 
     def predict(self, sentences: List[Tuple[str, str]], user=None) -> Optional[List[float]]:
+        """
+        通过外部 API 预测相关性分数
+
+        Args:
+            sentences: (查询, 文档) 元组列表
+            user: 可选的用户信息（用于传递用户头）
+
+        Returns:
+            浮点数分数列表，或失败时返回 None
+        """
         query = sentences[0][0]
         docs = [i[1] for i in sentences]
 

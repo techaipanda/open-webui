@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - Prompts
+  文件路径: src/lib/components/chat/MessageInput/Commands/Prompts.svelte
+-->
+
+
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import { tick, getContext, onMount, onDestroy } from 'svelte';
 	import { toast } from 'svelte-sonner';

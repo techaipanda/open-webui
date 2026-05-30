@@ -1,3 +1,19 @@
+"""
+RAG 文档加载器模块
+功能: 从不同来源加载文档（PDF、网页、YouTube 等）
+支持类型: PDF, URL, YouTube, GitHub, ArXiv, Office文档, EPUB 等
+
+核心概念:
+- 分块(Chunking): 将长文档分割成小块以便向量化和检索
+- 向量化(Embedding): 将文本转换为数学向量表示
+- 加载器工厂: 根据文件类型自动选择合适的加载器
+
+依赖:
+- langchain: 文档加载框架
+- PyMuPDF: PDF 解析
+- unstructured: 通用文档解析
+"""
+
 import asyncio
 import requests
 import logging
@@ -30,6 +46,8 @@ from open_webui.env import GLOBAL_LOG_LEVEL, REQUESTS_VERIFY, AIOHTTP_CLIENT_SES
 logging.basicConfig(stream=sys.stdout, level=GLOBAL_LOG_LEVEL)
 log = logging.getLogger(__name__)
 
+# 支持的纯文本文件扩展名列表
+# 用于区分需要特殊加载器的二进制文件
 known_source_ext = [
     'go',
     'py',
@@ -88,7 +106,18 @@ known_source_ext = [
 
 
 class ExcelLoader:
-    """Fallback Excel loader using pandas when unstructured is not installed."""
+    """
+    Excel 文档加载器（备用方案）
+
+    功能:
+        使用 pandas 库从 Excel 文件中提取文本内容
+
+    适用场景:
+        当 unstructured 包未安装时的备用方案
+
+    方法:
+        load(): 读取 Excel 文件的每个工作表，返回合并的文本内容
+    """
 
     def __init__(self, file_path):
         self.file_path = file_path
@@ -110,7 +139,18 @@ class ExcelLoader:
 
 
 class PptxLoader:
-    """Fallback PowerPoint loader using python-pptx when unstructured is not installed."""
+    """
+    PowerPoint 演示文稿加载器（备用方案）
+
+    功能:
+        使用 python-pptx 库从 PPT 文件中提取文本内容
+
+    适用场景:
+        当 unstructured 包未安装时的备用方案
+
+    方法:
+        load(): 读取演示文稿的每个幻灯片，返回合并的文本内容
+    """
 
     def __init__(self, file_path):
         self.file_path = file_path
@@ -136,11 +176,27 @@ class PptxLoader:
 
 
 class TikaLoader:
+    """
+    Apache Tika 文档加载器
+
+    功能:
+        使用 Apache Tika 服务器从任意格式文档中提取文本
+
+    支持格式:
+        PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, EPUB, HTML, XML, JSON 等
+
+    依赖:
+        - Tika 服务器运行在指定 URL
+        - Tika Python 客户端
+
+    方法:
+        load(): 通过 Tika REST API 提取文档文本
+    """
+
     def __init__(self, url, file_path, mime_type=None, extract_images=None):
         self.url = url
         self.file_path = file_path
         self.mime_type = mime_type
-
         self.extract_images = extract_images
 
     def load(self) -> list[Document]:
@@ -177,6 +233,21 @@ class TikaLoader:
 
 
 class DoclingLoader:
+    """
+    Docling 文档智能解析加载器
+
+    功能:
+        使用 Docling API 将文档（PDF, DOCX,图片等）转换为 Markdown 格式
+
+    特点:
+        - 支持多种文档格式
+        - 自动布局分析
+        - 将表格转换为结构化文本
+
+    方法:
+        load(): 调用 Docling API 进行文档转换
+    """
+
     def __init__(self, url, api_key=None, file_path=None, mime_type=None, params=None):
         self.url = url.rstrip('/')
         self.api_key = api_key
@@ -229,12 +300,50 @@ class DoclingLoader:
 
 
 class Loader:
+    """
+    文档加载器工厂类
+
+    功能:
+        根据文件类型和配置自动选择合适的加载器解析文档
+
+    支持的加载引擎:
+        - external: 外部文档加载服务
+        - tika: Apache Tika 服务器
+        - datalab_marker: DataLab Marker（支持 PDF/Office/EPUB 等）
+        - docling: Docling 智能文档解析
+        - document_intelligence: Azure AI Document Intelligence
+        - mineru: MinerU 文档解析
+        - mistral_ocr: Mistral OCR（PDF OCR）
+        - paddleocr_vl: PaddleOCR 视觉语言模型
+
+    核心逻辑:
+        1. 根据文件扩展名和 MIME 类型判断文件类型
+        2. 根据配置的引擎选择对应的加载器
+        3. 调用加载器解析文档并返回 Document 对象列表
+
+    方法:
+        load(): 同步加载文档
+        aload(): 异步加载文档（在线程池中执行，避免阻塞事件循环）
+        _get_loader(): 根据文件类型获取合适的加载器实例
+    """
+
     def __init__(self, engine: str = '', **kwargs):
         self.engine = engine
         self.user = kwargs.get('user', None)
         self.kwargs = kwargs
 
     def load(self, filename: str, file_content_type: str, file_path: str) -> list[Document]:
+        """
+        加载文档并返回 Document 对象列表
+
+        Args:
+            filename: 文件名
+            file_content_type: 文件的 MIME 类型
+            file_path: 文件路径
+
+        Returns:
+            Document 对象列表，每个 Document 包含 page_content 和 metadata
+        """
         loader = self._get_loader(filename, file_content_type, file_path)
         docs = loader.load()
 
@@ -242,17 +351,32 @@ class Loader:
 
     async def aload(self, filename: str, file_content_type: str, file_path: str) -> list[Document]:
         """
-        Async wrapper around `load`.
+        异步加载文档
 
-        Document loaders dispatched by `_get_loader` (PyMuPDF, Unstructured,
-        python-docx, Tika, etc.) are uniformly synchronous and CPU/IO-bound.
-        Calling `load` directly from an async handler would block the event
-        loop for the entire parse — minutes for large PDFs. This offloads
-        the work to a worker thread so the loop stays responsive.
+        使用 asyncio.to_thread 在线程池中执行耗时的文档解析操作，
+        避免阻塞异步事件循环
+
+        Args:
+            filename: 文件名
+            file_content_type: 文件的 MIME 类型
+            file_path: 文件路径
+
+        Returns:
+            Document 对象列表
         """
         return await asyncio.to_thread(self.load, filename, file_content_type, file_path)
 
     def _is_text_file(self, file_ext: str, file_content_type: str) -> bool:
+        """
+        判断是否为纯文本文件
+
+        Args:
+            file_ext: 文件扩展名
+            file_content_type: MIME 类型
+
+        Returns:
+            是否为纯文本文件
+        """
         return file_ext in known_source_ext or (
             file_content_type
             and file_content_type.find('text/') >= 0

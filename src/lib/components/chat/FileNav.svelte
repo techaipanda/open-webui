@@ -1,4 +1,11 @@
 <script context="module">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - FileNav
+  文件路径: src/lib/components/chat/FileNav.svelte
+-->
+
+
 	// Persists across mount/unmount cycles (module-level, not per-instance)
 	let savedPath = '/';
 </script>

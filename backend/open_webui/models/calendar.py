@@ -1,4 +1,12 @@
 import time
+"""
+数据模型: 日历模块
+数据库表: calendar, calendar_event, calendar_event_attendee
+功能: 管理用户日历和日程事件，支持事件参与者和 RSVP 状态跟踪
+关系: 与 User (多对一), 与 CalendarEvent (一对多), 与 CalendarEventAttendee (一对多)
+说明: 日历事件支持全天事件、重复规则（RRULE）、位置和颜色标记
+"""
+
 import logging
 from typing import Optional
 from uuid import uuid4
@@ -35,6 +43,24 @@ log = logging.getLogger(__name__)
 
 
 class Calendar(Base):
+    """
+    日历数据模型（SQLAlchemy ORM）
+
+    表名: calendar
+
+    字段说明:
+        id: UUID 主键，唯一标识日历
+        user_id: 所有者用户 ID
+        name: 日历名称（如 "Personal"）
+        color: 颜色代码（如 #3b82f6）
+        is_default: 是否为默认日历
+        data: 附加配置数据
+        meta: 元数据
+        created_at: 创建时间（纳秒）
+        updated_at: 更新时间（纳秒）
+
+    索引: ix_calendar_user (user_id)
+    """
     __tablename__ = 'calendar'
 
     id = Column(Text, primary_key=True)
@@ -52,6 +78,33 @@ class Calendar(Base):
 
 
 class CalendarEvent(Base):
+    """
+    日历事件数据模型（SQLAlchemy ORM）
+
+    表名: calendar_event
+
+    字段说明:
+        id: UUID 主键，唯一标识事件
+        calendar_id: 所属日历 ID
+        user_id: 创建者用户 ID
+        title: 事件标题
+        description: 事件描述
+        start_at: 开始时间（纳秒时间戳）
+        end_at: 结束时间（纳秒时间戳，可选）
+        all_day: 是否为全天事件
+        rrule: 重复规则（iCal RRULE 格式）
+        color: 颜色代码
+        location: 地点
+        data: 附加配置数据
+        meta: 元数据（如 alert_minutes 提醒分钟数）
+        is_cancelled: 是否已取消
+        created_at: 创建时间（纳秒）
+        updated_at: 更新时间（纳秒）
+
+    索引:
+        ix_calendar_event_calendar (calendar_id, start_at)
+        ix_calendar_event_user_date (user_id, start_at)
+    """
     __tablename__ = 'calendar_event'
 
     id = Column(Text, primary_key=True)
@@ -79,6 +132,23 @@ class CalendarEvent(Base):
 
 
 class CalendarEventAttendee(Base):
+    """
+    日历事件参与者数据模型（SQLAlchemy ORM）
+
+    表名: calendar_event_attendee
+
+    字段说明:
+        id: UUID 主键，唯一标识参与者记录
+        event_id: 关联的事件 ID
+        user_id: 参与者用户 ID
+        status: RSVP 状态（pending/accepted/declined/tentative）
+        meta: 元数据
+        created_at: 创建时间（纳秒）
+        updated_at: 更新时间（纳秒）
+
+    约束: 唯一约束 (event_id, user_id)
+    索引: ix_calendar_event_attendee_user (user_id, status)
+    """
     __tablename__ = 'calendar_event_attendee'
 
     id = Column(Text, primary_key=True)

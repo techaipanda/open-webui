@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 通用组件
+  功能描述: 通用组件 - FileItem
+  文件路径: src/lib/components/common/FileItem.svelte
+-->
+
+
 	import { createEventDispatcher, getContext } from 'svelte';
 	import { WEBUI_API_BASE_URL } from '$lib/constants';
 

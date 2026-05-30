@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - Chats
+  文件路径: src/lib/components/chat/MessageInput/InputMenu/Chats.svelte
+-->
+
+
 	import dayjs from 'dayjs';
 	import { onMount, tick, getContext } from 'svelte';
 

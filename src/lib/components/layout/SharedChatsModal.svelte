@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 布局组件
+  功能描述: 布局组件 - SharedChatsModal
+  文件路径: src/lib/components/layout/SharedChatsModal.svelte
+-->
+
+
 	import type { Writable } from 'svelte/store';
 	import { toast } from 'svelte-sonner';
 	import { getContext } from 'svelte';

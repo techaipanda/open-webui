@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - UserMessage
+  文件路径: src/lib/components/chat/Messages/UserMessage.svelte
+-->
+
+
 	import dayjs from 'dayjs';
 	import { toast } from 'svelte-sonner';
 	import { tick, getContext, onMount } from 'svelte';

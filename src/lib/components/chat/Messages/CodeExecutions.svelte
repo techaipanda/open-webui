@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - CodeExecutions
+  文件路径: src/lib/components/chat/Messages/CodeExecutions.svelte
+-->
+
+
 	import CodeExecutionModal from './CodeExecutionModal.svelte';
 	import Spinner from '$lib/components/common/Spinner.svelte';
 	import Check from '$lib/components/icons/Check.svelte';

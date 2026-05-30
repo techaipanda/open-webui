@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - SyncStatsModal
+  文件路径: src/lib/components/chat/Settings/SyncStatsModal.svelte
+-->
+
+
 	import { Confetti } from 'svelte-confetti';
 	import { toast } from 'svelte-sonner';
 	import { getContext, onMount, onDestroy, tick } from 'svelte';

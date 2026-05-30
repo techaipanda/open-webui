@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - TaskList
+  文件路径: src/lib/components/chat/Messages/ResponseMessage/TaskList.svelte
+-->
+
+
 	import { getContext } from 'svelte';
 	import { slide } from 'svelte/transition';
 	import TaskListIcon from '$lib/components/icons/TaskList.svelte';

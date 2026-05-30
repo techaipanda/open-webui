@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - Emojis
+  文件路径: src/lib/components/chat/MessageInput/Commands/Emojis.svelte
+-->
+
+
 	import { getContext } from 'svelte';
 
 	import { WEBUI_BASE_URL } from '$lib/constants';

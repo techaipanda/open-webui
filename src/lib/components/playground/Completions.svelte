@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: Playground组件
+  功能描述: Playground组件 - Completions
+  文件路径: src/lib/components/playground/Completions.svelte
+-->
+
+
 	import { toast } from 'svelte-sonner';
 
 	import { goto } from '$app/navigation';

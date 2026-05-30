@@ -1,4 +1,11 @@
 <script>
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - GroupItem
+  文件路径: src/lib/components/admin/Users/Groups/GroupItem.svelte
+-->
+
+
 	import { toast } from 'svelte-sonner';
 	import { onMount, getContext } from 'svelte';
 	import { page } from '$app/stores';

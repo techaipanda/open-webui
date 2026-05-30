@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - CodeExecutionModal
+  文件路径: src/lib/components/chat/Messages/CodeExecutionModal.svelte
+-->
+
+
 	import { getContext } from 'svelte';
 	import CodeBlock from './CodeBlock.svelte';
 	import Modal from '$lib/components/common/Modal.svelte';

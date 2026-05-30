@@ -1,5 +1,17 @@
 import { OPENAI_API_BASE_URL, WEBUI_API_BASE_URL, WEBUI_BASE_URL } from '$lib/constants';
 
+/**
+ * API 客户端模块 - OpenAI 兼容 API
+ *
+ * 功能说明:
+ * - OpenAI 兼容端点调用
+ * - 模型列表获取
+ * - 直接 API 调用封装
+ *
+ * 主要API端点:
+ * - /openai/* - OpenAI 兼容操作
+ */
+
 export const getOpenAIConfig = async (token: string = '') => {
 	let error = null;
 

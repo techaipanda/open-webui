@@ -1,4 +1,11 @@
 <script>
+<!--
+  组件分类: 管理组件
+  功能描述: 管理组件 - Analytics
+  文件路径: src/lib/components/admin/Analytics.svelte
+-->
+
+
 	import { onMount, getContext } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { user } from '$lib/stores';

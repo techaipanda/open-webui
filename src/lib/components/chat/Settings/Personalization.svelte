@@ -1,4 +1,11 @@
 <script lang="ts">
+<!--
+  组件分类: 聊天组件
+  功能描述: 聊天组件 - Personalization
+  文件路径: src/lib/components/chat/Settings/Personalization.svelte
+-->
+
+
 	import Switch from '$lib/components/common/Switch.svelte';
 	import { config, models, settings, user } from '$lib/stores';
 	import { createEventDispatcher, onMount, getContext, tick } from 'svelte';

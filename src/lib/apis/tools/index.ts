@@ -1,5 +1,17 @@
 import { WEBUI_API_BASE_URL } from '$lib/constants';
 
+/**
+ * API 客户端模块 - 工具 API
+ *
+ * 功能说明:
+ * - 工具列表与配置
+ * - 工具执行管理
+ * - 工具服务器集成
+ *
+ * 主要API端点:
+ * - /tools/* - 工具相关操作
+ */
+
 export const createNewTool = async (token: string, tool: object) => {
 	let error = null;
 
